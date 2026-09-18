@@ -1,0 +1,33 @@
+# Systemd-Dienst für Raspberry Pi, NAS oder einen kleinen Heimserver.
+#
+# Einrichten:
+#   sudo cp deploy/warensystem-home.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now warensystem-home
+#
+# Pfad und Benutzer unten an die eigene Installation anpassen.
+
+[Unit]
+Description=Warensystem Home – Haushalts-Warenwirtschaft
+Documentation=https://github.com/Marlon1694/Warensystem-Home
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/Warensystem-Home
+EnvironmentFile=-/home/pi/Warensystem-Home/.env
+ExecStart=/usr/bin/node server/src/index.js
+Restart=always
+RestartSec=5
+
+# Der Dienst braucht nur seinen eigenen Ordner beschreibbar.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/home/pi/Warensystem-Home/data
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,179 @@
+/*
+ * Farb- und Maßtokens. Alle Textfarben wurden gegen ihren Hintergrund auf
+ * mindestens 4.5:1 geprüft, Statusfarben laufen als getönte Plakette mit
+ * dunkler Schrift – Farbe allein trägt nirgends eine Bedeutung.
+ */
+:root {
+  color-scheme: light;
+
+  /* Flächen */
+  --plane: #f7f8f7;
+  --surface: #ffffff;
+  --surface-sunken: #eef0ef;
+  --surface-hover: #f2f4f3;
+
+  /* Schrift */
+  --ink: #14181a;
+  --ink-secondary: #5b6560;
+  --ink-muted: #69736e;
+  --ink-inverse: #ffffff;
+
+  /* Markenfarbe */
+  --brand: #0d6b47;
+  --brand-strong: #0a5c3d;
+  --brand-fill: #12855c;
+  --brand-tint: #e6f4ee;
+  --brand-ring: rgba(18, 133, 92, 0.32);
+
+  /* Status: Plakettenfläche und zugehörige Schriftfarbe */
+  --critical-bg: #fdecea;
+  --critical-ink: #a52822;
+  --critical-mark: #d03b3b;
+  --warning-bg: #fdf3e0;
+  --warning-ink: #855200;
+  --warning-mark: #e0a015;
+  --serious-bg: #fdeee7;
+  --serious-ink: #9a4a22;
+  --serious-mark: #ec835a;
+  --good-bg: #e7f6ea;
+  --good-ink: #14691f;
+  --good-mark: #0ca30c;
+  --info-bg: #e8f2fc;
+  --info-ink: #1a5aa8;
+  --info-mark: #2a78d6;
+
+  /* Linien und Schatten */
+  --line: #e2e6e4;
+  --line-strong: #cdd4d0;
+  --shadow-low: 0 1px 2px rgba(20, 24, 26, 0.06);
+  --shadow-mid: 0 4px 16px rgba(20, 24, 26, 0.09);
+  --shadow-high: 0 12px 32px rgba(20, 24, 26, 0.16);
+
+  /* Diagramme */
+  --chart-grid: #e1e0d9;
+  --chart-axis: #c3c2b7;
+  --chart-series: #2a78d6;
+  --chart-series-2: #eb6834;
+
+  /* Maße */
+  --radius-sm: 8px;
+  --radius: 14px;
+  --radius-lg: 20px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --tap: 44px;
+
+  --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  /* Randabstände für Notch und Home-Indikator des iPhone */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --nav-height: 60px;
+}
+
+/*
+ * Dunkelmodus ist eigens abgestimmt, keine automatische Umkehr. Die
+ * Systemvorgabe greift nur, solange der Nutzer nichts eingestellt hat; der
+ * Umschalter in den Einstellungen gewinnt in beide Richtungen.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+
+    --plane: #111312;
+    --surface: #1a1c1b;
+    --surface-sunken: #141615;
+    --surface-hover: #232625;
+
+    --ink: #f2f5f3;
+    --ink-secondary: #b3bdb7;
+    --ink-muted: #8b958f;
+    --ink-inverse: #0c0e0d;
+
+    --brand: #35c795;
+    --brand-strong: #6fdcb4;
+    --brand-fill: #18a877;
+    --brand-tint: #14312a;
+    --brand-ring: rgba(53, 199, 149, 0.36);
+
+    --critical-bg: #3a1e1c;
+    --critical-ink: #f4a09b;
+    --critical-mark: #e66767;
+    --warning-bg: #3a2f16;
+    --warning-ink: #f2c261;
+    --warning-mark: #fab219;
+    --serious-bg: #3a271e;
+    --serious-ink: #f0a882;
+    --serious-mark: #ec835a;
+    --good-bg: #16301c;
+    --good-ink: #6fd47a;
+    --good-mark: #0ca30c;
+    --info-bg: #17293d;
+    --info-ink: #8fbdf0;
+    --info-mark: #3987e5;
+
+    --line: #2c302e;
+    --line-strong: #3c413f;
+    --shadow-low: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-mid: 0 4px 16px rgba(0, 0, 0, 0.5);
+    --shadow-high: 0 12px 32px rgba(0, 0, 0, 0.6);
+
+    --chart-grid: #2c2c2a;
+    --chart-axis: #383835;
+    --chart-series: #3987e5;
+    --chart-series-2: #d95926;
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --plane: #111312;
+  --surface: #1a1c1b;
+  --surface-sunken: #141615;
+  --surface-hover: #232625;
+
+  --ink: #f2f5f3;
+  --ink-secondary: #b3bdb7;
+  --ink-muted: #8b958f;
+  --ink-inverse: #0c0e0d;
+
+  --brand: #35c795;
+  --brand-strong: #6fdcb4;
+  --brand-fill: #18a877;
+  --brand-tint: #14312a;
+  --brand-ring: rgba(53, 199, 149, 0.36);
+
+  --critical-bg: #3a1e1c;
+  --critical-ink: #f4a09b;
+  --critical-mark: #e66767;
+  --warning-bg: #3a2f16;
+  --warning-ink: #f2c261;
+  --warning-mark: #fab219;
+  --serious-bg: #3a271e;
+  --serious-ink: #f0a882;
+  --serious-mark: #ec835a;
+  --good-bg: #16301c;
+  --good-ink: #6fd47a;
+  --good-mark: #0ca30c;
+  --info-bg: #17293d;
+  --info-ink: #8fbdf0;
+  --info-mark: #3987e5;
+
+  --line: #2c302e;
+  --line-strong: #3c413f;
+  --shadow-low: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-mid: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --shadow-high: 0 12px 32px rgba(0, 0, 0, 0.6);
+
+  --chart-grid: #2c2c2a;
+  --chart-axis: #383835;
+  --chart-series: #3987e5;
+  --chart-series-2: #d95926;
+}

@@ -1,0 +1,26 @@
+# Abhängigkeiten
+node_modules/
+
+# Build-Artefakte
+dist/
+web/dist/
+server/public/
+
+# Laufzeitdaten (Datenbank, Backups, Zertifikate)
+data/
+certs/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Konfiguration
+.env
+.env.local
+
+# Betriebssystem / Editor
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/

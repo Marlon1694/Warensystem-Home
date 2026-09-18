@@ -1,0 +1,28 @@
+services:
+  warensystem:
+    build: .
+    image: warensystem-home:latest
+    container_name: warensystem-home
+    restart: unless-stopped
+
+    # host-Netzwerk vereinfacht den Zugriff aus dem Heimnetz und sorgt dafür,
+    # dass der Server die echten LAN-Adressen beim Start ausgibt.
+    # Wer lieber Portweiterleitung nutzt, ersetzt network_mode durch "ports".
+    network_mode: host
+    # ports:
+    #   - "4000:4000"
+
+    environment:
+      PORT: 4000
+      # Vorwarnzeit für Mindesthaltbarkeitsdaten in Tagen
+      EXPIRY_WARN_DAYS: 5
+      # Barcode-Nachschlag bei Open Food Facts; false hält alles im Heimnetz
+      OFF_ENABLED: "true"
+      # auto = HTTPS, sobald unter /certs ein Zertifikat liegt
+      TLS_MODE: auto
+
+    volumes:
+      # Datenbank und automatische Sicherungen
+      - ./data:/data
+      # Zertifikat für den Kamerazugriff auf iPhone und iPad
+      - ./certs:/certs

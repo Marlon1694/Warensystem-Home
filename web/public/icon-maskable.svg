@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Warensystem Home">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#18a877"/>
+      <stop offset="1" stop-color="#0d6b47"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <!-- Glyph auf 62 % skaliert: bleibt innerhalb der sicheren Zone runder Masken -->
+  <g fill="#ffffff" transform="translate(97.28 97.28) scale(0.62)">
+    <rect x="136" y="196" width="76" height="120" rx="16"/>
+    <rect x="220" y="138" width="72" height="26" rx="13"/>
+    <rect x="228" y="164" width="56" height="152" rx="14"/>
+    <rect x="300" y="224" width="76" height="92" rx="16"/>
+    <rect x="108" y="322" width="296" height="22" rx="11"/>
+    <rect x="108" y="388" width="296" height="22" rx="11" opacity="0.55"/>
+  </g>
+</svg>
