@@ -1,4 +1,5 @@
 import { db, closeDatabase } from './index.js';
+import { DEFAULT_DASHBOARD } from '../lib/domain.js';
 
 /**
  * Typische Lagerorte eines Haushalts. "kind" steuert Symbol und Sortierung in
@@ -33,6 +34,7 @@ const DEFAULT_SETTINGS = [
   ['household_name', 'Zuhause'],
   ['expiry_warn_days', '5'],
   ['currency', 'EUR'],
+  ['dashboard_layout', JSON.stringify(DEFAULT_DASHBOARD)],
 ];
 
 /**

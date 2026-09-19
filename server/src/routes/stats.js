@@ -154,6 +154,30 @@ statsRouter.get('/top', (req, res) => {
   });
 });
 
+/** Die jüngsten Buchungen über alle Artikel hinweg – für die Übersicht. */
+statsRouter.get('/recent', (req, res) => {
+  const limit = Math.min(Math.max(Number(req.query.limit) || 5, 1), 50);
+
+  const rows = db().prepare(`
+    SELECT
+      m.id, m.product_id, m.type, m.quantity, m.unit, m.price, m.note, m.created_at,
+      p.name  AS product_name,
+      c.name  AS category_name,
+      c.color AS category_color,
+      l.name  AS location_name,
+      t.name  AS to_location_name
+    FROM movements m
+    JOIN products p ON p.id = m.product_id
+    LEFT JOIN categories c ON c.id = p.category_id
+    LEFT JOIN locations  l ON l.id = m.location_id
+    LEFT JOIN locations  t ON t.id = m.to_location_id
+    ORDER BY m.created_at DESC, m.id DESC
+    LIMIT ?
+  `).all(limit);
+
+  res.json(rows);
+});
+
 /** Wie viel wird weggeworfen statt verbraucht? */
 statsRouter.get('/waste', (req, res) => {
   const days = period(req.query.days, 90);

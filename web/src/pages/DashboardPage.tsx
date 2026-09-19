@@ -1,218 +1,233 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Layout } from '../components/Layout';
-import { CategoryDot, EmptyState, ErrorNotice, ExpiryBadge, ListSkeleton } from '../components/ui';
+import { ErrorNotice } from '../components/ui';
+import { DashboardWidget } from '../components/dashboard/widgets';
+import { WidgetOptionsSheet } from '../components/dashboard/WidgetOptionsSheet';
+import { AddWidgetSheet } from '../components/dashboard/AddWidgetSheet';
 import {
   IconCheck,
-  IconChevron,
-  IconClock,
+  IconClose,
+  IconEdit,
   IconMoon,
+  IconPlus,
+  IconRefresh,
   IconSettings,
   IconSun,
   IconTrash,
-  LocationIcon,
 } from '../components/Icons';
 import { useToast } from '../components/Toast';
-import { useConsume, useExpiring, useLocations, useOverview, useSettings } from '../api/hooks';
+import { useLocations, useOverview, useSaveSettings, useSettings } from '../api/hooks';
 import { useTheme } from '../lib/theme';
-import { formatQuantity } from '../lib/format';
-import type { ExpiringBatch } from '../types';
+import {
+  DEFAULT_LAYOUT,
+  createWidget,
+  moveWidget,
+  parseLayout,
+  serializeLayout,
+  widgetLabel,
+  type Widget,
+  type WidgetType,
+} from '../lib/dashboard';
 
 export function DashboardPage() {
-  const overview = useOverview();
-  const expiring = useExpiring();
-  const locations = useLocations();
   const settings = useSettings();
-  const consume = useConsume();
+  const overview = useOverview();
+  const locations = useLocations();
+  const saveSettings = useSaveSettings();
   const toast = useToast();
-  const navigate = useNavigate();
   const { preference, cycle } = useTheme();
 
+  /** Solange bearbeitet wird, gilt der Entwurf; gespeichert wird erst am Ende. */
+  const [draft, setDraft] = useState<Widget[] | null>(null);
+  const [optionsFor, setOptionsFor] = useState<Widget | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+
+  const saved = parseLayout(settings.data?.dashboard_layout);
+  const layout = draft ?? saved;
+  const editing = draft !== null;
+
   const warnDays = overview.data?.warn_days ?? 5;
+  const currency = settings.data?.currency ?? 'EUR';
   const householdName = settings.data?.household_name ?? 'Zuhause';
 
-  /** Ganzer Posten in einem Schritt – der Regelfall bei ablaufender Ware. */
-  async function bookWholeBatch(batch: ExpiringBatch, type: 'consume' | 'waste') {
+  function update(next: Widget[]) {
+    setDraft(next);
+  }
+
+  async function save() {
+    if (!draft) return;
+
     try {
-      await consume.mutateAsync({
-        product_id: batch.product_id,
-        stock_item_id: batch.id,
-        quantity: batch.quantity,
-        type,
-      });
-      toast.notify(
-        `${formatQuantity(batch.quantity, batch.unit)} ${batch.product_name} ` +
-        `${type === 'consume' ? 'verbraucht' : 'entsorgt'}`,
-      );
+      await saveSettings.mutateAsync({ dashboard_layout: serializeLayout(draft) });
+      setDraft(null);
+      toast.notify('Übersicht gespeichert');
     } catch (error) {
-      toast.warn(error instanceof Error ? error.message : 'Buchung fehlgeschlagen');
+      toast.warn(error instanceof Error ? error.message : 'Speichern fehlgeschlagen');
     }
+  }
+
+  function addWidget(type: WidgetType) {
+    update([...layout, createWidget(type)]);
+    setAddOpen(false);
+  }
+
+  function removeWidget(index: number) {
+    update(layout.filter((_, position) => position !== index));
+  }
+
+  function applyOptions(options: Record<string, unknown>) {
+    if (!optionsFor) return;
+    update(layout.map((widget) => (widget.id === optionsFor.id ? { ...widget, options } : widget)));
+    setOptionsFor(null);
   }
 
   return (
     <Layout
-      title={householdName}
-      subtitle="Vorräte im Blick"
+      title={editing ? 'Anpassen' : householdName}
+      subtitle={editing ? 'Sortieren, einstellen, entfernen' : 'Vorräte im Blick'}
       actions={
-        <div className="row" style={{ gap: 'var(--space-1)' }}>
-          <button type="button" className="btn btn--ghost btn--icon" onClick={cycle}>
-            {preference === 'dark' ? <IconMoon /> : <IconSun />}
-            <span className="visually-hidden">
-              Darstellung umschalten (aktuell: {preference === 'system' ? 'automatisch' : preference === 'dark' ? 'dunkel' : 'hell'})
-            </span>
-          </button>
-          <Link to="/einstellungen" className="btn btn--ghost btn--icon">
-            <IconSettings />
-            <span className="visually-hidden">Einstellungen</span>
-          </Link>
-        </div>
+        editing ? (
+          <div className="row" style={{ gap: 'var(--space-1)' }}>
+            <button
+              type="button"
+              className="btn btn--ghost btn--icon"
+              onClick={() => setDraft(null)}
+              disabled={saveSettings.isPending}
+            >
+              <IconClose />
+              <span className="visually-hidden">Anpassen abbrechen</span>
+            </button>
+            <button
+              type="button"
+              className="btn btn--primary btn--small"
+              onClick={() => void save()}
+              disabled={saveSettings.isPending}
+            >
+              {saveSettings.isPending ? <span className="spinner" /> : <><IconCheck size={16} /> Fertig</>}
+            </button>
+          </div>
+        ) : (
+          <div className="row" style={{ gap: 'var(--space-1)' }}>
+            <button type="button" className="btn btn--ghost btn--icon" onClick={() => setDraft(saved)}>
+              <IconEdit />
+              <span className="visually-hidden">Übersicht anpassen</span>
+            </button>
+            <button type="button" className="btn btn--ghost btn--icon" onClick={cycle}>
+              {preference === 'dark' ? <IconMoon /> : <IconSun />}
+              <span className="visually-hidden">
+                Darstellung umschalten (aktuell: {preference === 'system' ? 'automatisch' : preference === 'dark' ? 'dunkel' : 'hell'})
+              </span>
+            </button>
+            <Link to="/einstellungen" className="btn btn--ghost btn--icon">
+              <IconSettings />
+              <span className="visually-hidden">Einstellungen</span>
+            </Link>
+          </div>
+        )
       }
     >
       <div className="stack stack--loose">
-        <section aria-label="Kennzahlen">
-          {overview.isError ? (
-            <ErrorNotice error={overview.error} onRetry={() => void overview.refetch()} />
-          ) : (
-            <div className="grid-2">
-              <Link to="/bestand?filter=abgelaufen" className="stat stat--critical">
-                <span className="stat__value numeric">{overview.data?.expired ?? '–'}</span>
-                <span className="stat__label">abgelaufen</span>
-              </Link>
-              <Link to="/bestand?filter=bald" className="stat stat--warning">
-                <span className="stat__value numeric">{overview.data?.expiring_soon ?? '–'}</span>
-                <span className="stat__label">läuft bald ab</span>
-              </Link>
-              <Link to="/bestand?filter=mindestbestand" className="stat">
-                <span className="stat__value numeric">{overview.data?.below_min_stock ?? '–'}</span>
-                <span className="stat__label">unter Mindestbestand</span>
-              </Link>
-              <Link to="/bestand" className="stat stat--brand">
-                <span className="stat__value numeric">{overview.data?.products_in_stock ?? '–'}</span>
-                <span className="stat__label">Artikel im Bestand</span>
-              </Link>
-            </div>
-          )}
-        </section>
+        {settings.isError ? (
+          <ErrorNotice error={settings.error} onRetry={() => void settings.refetch()} />
+        ) : null}
 
-        <section aria-labelledby="expiring-heading">
-          <div className="section-title">
-            <h2 id="expiring-heading">Bald aufbrauchen</h2>
-            <span className="small muted">Vorwarnung {warnDays} Tage</span>
-          </div>
-
-          {expiring.isPending ? <ListSkeleton /> : null}
-          {expiring.isError ? <ErrorNotice error={expiring.error} onRetry={() => void expiring.refetch()} /> : null}
-
-          {expiring.data?.length === 0 ? (
-            <div className="card">
-              <EmptyState
-                icon={<IconCheck size={30} />}
-                title="Nichts läuft demnächst ab"
-                hint="Alle Mindesthaltbarkeitsdaten liegen außerhalb der Vorwarnzeit."
-              />
-            </div>
-          ) : null}
-
-          {expiring.data && expiring.data.length > 0 ? (
-            <ul className="list">
-              {expiring.data.slice(0, 10).map((batch) => (
-                <li key={batch.id}>
-                  <div className="list__item">
-                    <button
-                      type="button"
-                      className="list__body"
-                      style={{ background: 'none', border: 0, padding: 0, textAlign: 'left' }}
-                      onClick={() => navigate(`/artikel/${batch.product_id}`)}
-                    >
-                      <div className="list__title">{batch.product_name}</div>
-                      <div className="list__meta">
-                        <CategoryDot color={batch.category_color} />
-                        <span className="truncate">
-                          {formatQuantity(batch.quantity, batch.unit)} · {batch.location_name}
-                          {batch.opened ? ' · angebrochen' : ''}
-                        </span>
-                      </div>
-                      <div style={{ marginTop: 5 }}>
-                        <ExpiryBadge bestBefore={batch.best_before} warnDays={warnDays} />
-                      </div>
-                    </button>
-
-                    <div className="row" style={{ gap: 'var(--space-1)', flex: 'none' }}>
-                      <button
-                        type="button"
-                        className="btn btn--ghost btn--icon"
-                        onClick={() => void bookWholeBatch(batch, 'consume')}
-                        disabled={consume.isPending}
-                        title="Komplett verbraucht"
-                      >
-                        <IconCheck />
-                        <span className="visually-hidden">
-                          {batch.product_name} komplett als verbraucht buchen
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn--ghost btn--icon"
-                        onClick={() => void bookWholeBatch(batch, 'waste')}
-                        disabled={consume.isPending}
-                        title="Entsorgt"
-                      >
-                        <IconTrash />
-                        <span className="visually-hidden">
-                          {batch.product_name} komplett als entsorgt buchen
-                        </span>
-                      </button>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-
-          {expiring.data && expiring.data.length > 10 ? (
-            <Link to="/bestand?filter=bald" className="btn btn--block" style={{ marginTop: 'var(--space-2)' }}>
-              Alle {expiring.data.length} anzeigen
-            </Link>
-          ) : null}
-        </section>
-
-        <section aria-labelledby="locations-heading">
-          <div className="section-title">
-            <h2 id="locations-heading">Lagerorte</h2>
-            <Link to="/einstellungen" className="small">Verwalten</Link>
-          </div>
-
-          <ul className="list">
-            {locations.data?.map((location) => (
-              <li key={location.id}>
-                <Link to={`/bestand?ort=${location.id}`} className="list__item">
-                  <LocationIcon kind={location.kind} size={22} style={{ color: 'var(--ink-secondary)' }} />
-                  <div className="list__body">
-                    <div className="list__title">{location.name}</div>
-                    {location.note ? (
-                      <div className="list__meta"><span className="truncate">{location.note}</span></div>
-                    ) : null}
-                  </div>
-                  <span className="list__value numeric">
-                    {location.article_count}
-                    <span className="small muted"> Art.</span>
+        {layout.map((widget, index) => (
+          <div key={widget.id}>
+            {editing ? (
+              <div className="widget-edit">
+                <div className="widget-edit__bar">
+                  <span className="widget-edit__name">
+                    {widgetLabel(
+                      widget,
+                      locations.data?.find((row) => row.id === Number(widget.options.location_id))?.name,
+                    )}
                   </span>
-                  <IconChevron size={16} className="list__chevron" />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
 
-        {overview.data && overview.data.stock_value > 0 ? (
-          <p className="small muted row" style={{ justifyContent: 'center', flexWrap: 'wrap' }}>
-            <IconClock size={14} />
-            Erfasster Warenwert: {new Intl.NumberFormat('de-DE', {
-              style: 'currency',
-              currency: settings.data?.currency ?? 'EUR',
-            }).format(overview.data.stock_value)}
-          </p>
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--small btn--icon"
+                    onClick={() => update(moveWidget(layout, index, -1))}
+                    disabled={index === 0}
+                  >
+                    <span aria-hidden="true">↑</span>
+                    <span className="visually-hidden">Nach oben</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--small btn--icon"
+                    onClick={() => update(moveWidget(layout, index, 1))}
+                    disabled={index === layout.length - 1}
+                  >
+                    <span aria-hidden="true">↓</span>
+                    <span className="visually-hidden">Nach unten</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--small btn--icon"
+                    onClick={() => setOptionsFor(widget)}
+                  >
+                    <IconSettings size={17} />
+                    <span className="visually-hidden">Abschnitt einstellen</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--small btn--icon"
+                    onClick={() => removeWidget(index)}
+                  >
+                    <IconTrash size={17} />
+                    <span className="visually-hidden">Abschnitt entfernen</span>
+                  </button>
+                </div>
+
+                <div className="widget-edit__body">
+                  <DashboardWidget widget={widget} currency={currency} warnDays={warnDays} />
+                </div>
+              </div>
+            ) : (
+              <DashboardWidget widget={widget} currency={currency} warnDays={warnDays} />
+            )}
+          </div>
+        ))}
+
+        {editing ? (
+          <div className="stack stack--tight">
+            <button type="button" className="btn btn--block" onClick={() => setAddOpen(true)}>
+              <IconPlus size={18} /> Abschnitt hinzufügen
+            </button>
+            <button
+              type="button"
+              className="btn btn--ghost btn--block"
+              onClick={() => update(DEFAULT_LAYOUT.map((widget) => ({ ...widget, options: { ...widget.options } })))}
+            >
+              <IconRefresh size={18} /> Auf Vorgabe zurücksetzen
+            </button>
+          </div>
+        ) : null}
+
+        {!editing && layout.length === 0 ? (
+          <button type="button" className="btn btn--primary btn--block" onClick={() => setDraft(saved)}>
+            <IconPlus size={18} /> Übersicht zusammenstellen
+          </button>
         ) : null}
       </div>
+
+      <AddWidgetSheet
+        open={addOpen}
+        present={layout.map((widget) => widget.type)}
+        onClose={() => setAddOpen(false)}
+        onAdd={addWidget}
+      />
+
+      <WidgetOptionsSheet
+        widget={optionsFor}
+        open={optionsFor !== null}
+        onClose={() => setOptionsFor(null)}
+        onSave={applyOptions}
+      />
     </Layout>
   );
 }

@@ -227,6 +227,85 @@ describe('Haltbarkeit und Auswertung', () => {
   });
 });
 
+describe('Zusammenstellung der Übersicht', () => {
+  it('liefert eine Vorgabe für einen frischen Haushalt', async () => {
+    const settings = (await api('GET', '/api/settings')).body;
+    const layout = JSON.parse(settings.dashboard_layout);
+
+    assert.ok(Array.isArray(layout));
+    assert.deepEqual(layout.map((widget) => widget.type), ['stats', 'expiring', 'locations']);
+  });
+
+  it('speichert eine eigene Zusammenstellung', async () => {
+    const layout = [
+      { id: 'a', type: 'note', options: { title: 'Merkzettel', text: 'Hefe kaufen' } },
+      { id: 'b', type: 'recent', options: { limit: 3 } },
+    ];
+
+    const saved = await api('PUT', '/api/settings', { dashboard_layout: JSON.stringify(layout) });
+    assert.equal(saved.status, 200);
+
+    const stored = JSON.parse(saved.body.dashboard_layout);
+    assert.equal(stored[0].options.title, 'Merkzettel');
+    assert.equal(stored[1].options.limit, 3);
+  });
+
+  it('weist unbekannte Abschnitte ab', async () => {
+    const { status } = await api('PUT', '/api/settings', {
+      dashboard_layout: JSON.stringify([{ id: 'x', type: 'aktienkurse' }]),
+    });
+    assert.equal(status, 400);
+  });
+
+  it('weist doppelte Abschnitts-IDs ab', async () => {
+    const { status } = await api('PUT', '/api/settings', {
+      dashboard_layout: JSON.stringify([
+        { id: 'gleich', type: 'note' },
+        { id: 'gleich', type: 'recent' },
+      ]),
+    });
+    assert.equal(status, 400);
+  });
+
+  it('verlangt beim Lagerort-Abschnitt einen Lagerort', async () => {
+    const { status } = await api('PUT', '/api/settings', {
+      dashboard_layout: JSON.stringify([{ id: 'ort', type: 'location_stock', options: {} }]),
+    });
+    assert.equal(status, 400);
+  });
+
+  it('räumt unsinnige Einstellungen auf, statt sie zu übernehmen', async () => {
+    const { body } = await api('PUT', '/api/settings', {
+      dashboard_layout: JSON.stringify([
+        { id: 'kacheln', type: 'stats', options: { tiles: ['expired', 'aktienkurs'] } },
+        { id: 'liste', type: 'recent', options: { limit: 9999 } },
+      ]),
+    });
+
+    const stored = JSON.parse(body.dashboard_layout);
+    assert.deepEqual(stored[0].options.tiles, ['expired']);
+    assert.equal(stored[1].options.limit, 5);
+  });
+
+  it('nimmt kein beschädigtes JSON an', async () => {
+    const { status } = await api('PUT', '/api/settings', { dashboard_layout: '{kaputt' });
+    assert.equal(status, 400);
+  });
+});
+
+describe('Letzte Buchungen', () => {
+  it('liefert die jüngsten Buchungen mit Artikelnamen, neueste zuerst', async () => {
+    const { status, body } = await api('GET', '/api/stats/recent?limit=3');
+
+    assert.equal(status, 200);
+    assert.ok(body.length > 0 && body.length <= 3);
+    assert.ok(body[0].product_name, 'Artikelname fehlt');
+
+    const timestamps = body.map((row) => row.created_at);
+    assert.deepEqual(timestamps, [...timestamps].sort().reverse());
+  });
+});
+
 describe('Sicherung', () => {
   it('exportiert und spielt den Bestand vollständig wieder ein', async () => {
     const before = (await api('GET', '/api/products')).body;

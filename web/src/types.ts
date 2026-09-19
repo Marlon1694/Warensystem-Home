@@ -193,11 +193,33 @@ export interface Settings {
   household_name: string;
   expiry_warn_days: string;
   currency: string;
+  /** Zusammenstellung der Übersicht als JSON, siehe lib/dashboard.ts. */
+  dashboard_layout?: string;
+}
+
+/** Jüngste Buchungen über alle Artikel hinweg. */
+export interface RecentMovement {
+  id: number;
+  product_id: number;
+  product_name: string;
+  type: MovementType;
+  quantity: number;
+  unit: string;
+  price: number | null;
+  note: string | null;
+  created_at: string;
+  category_name: string | null;
+  category_color: string | null;
+  location_name: string | null;
+  to_location_name: string | null;
 }
 
 export interface Meta {
   units: string[];
   location_kinds: LocationKind[];
   movement_types: MovementType[];
+  dashboard_widgets: string[];
+  dashboard_tiles: string[];
+  default_dashboard: Array<{ id: string; type: string; options: Record<string, unknown> }>;
   revision: number;
 }

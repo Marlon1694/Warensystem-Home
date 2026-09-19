@@ -11,6 +11,7 @@
  * Die Daten leben nur in dieser Sitzung: ein Neuladen setzt alles zurück.
  */
 import { CATEGORIES, LOCATIONS, PRODUCTS, SHOPPING_EXTRA, isoInDays } from './seed';
+import { DEFAULT_LAYOUT, TILE_KEYS, WIDGET_TYPES } from '../lib/dashboard';
 
 type Row = Record<string, any>;
 
@@ -25,7 +26,12 @@ const store = {
   stock: [] as Row[],
   movements: [] as Row[],
   shopping: [] as Row[],
-  settings: { household_name: 'Zuhause', expiry_warn_days: '5', currency: 'EUR' } as Record<string, string>,
+  settings: {
+    household_name: 'Zuhause',
+    expiry_warn_days: '5',
+    currency: 'EUR',
+    dashboard_layout: JSON.stringify(DEFAULT_LAYOUT),
+  } as Record<string, string>,
   revision: 0,
 };
 
@@ -962,6 +968,27 @@ const routes: Array<[string, RegExp, Handler]> = [
   )],
   ['GET', /^\/stats\/waste$/, (_p, _body, query) => wasteReport(Number(query.get('days') ?? 90))],
 
+  ['GET', /^\/stats\/recent$/, (_p, _body, query) => {
+    const limit = Math.min(Math.max(Number(query.get('limit')) || 5, 1), 50);
+
+    return [...store.movements]
+      .sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : b.id - a.id))
+      .slice(0, limit)
+      .map((movement) => {
+        const product = productOf(movement.product_id);
+        const category = categoryOf(product?.category_id ?? null);
+
+        return {
+          ...movement,
+          product_name: product?.name ?? '',
+          category_name: category?.name ?? null,
+          category_color: category?.color ?? null,
+          location_name: locationOf(movement.location_id)?.name ?? null,
+          to_location_name: locationOf(movement.to_location_id)?.name ?? null,
+        };
+      });
+  }],
+
   ['GET', /^\/barcode\/(\d+)$/, (parts) => {
     const barcode = parts[0] as string;
     const known = store.products.find((row) => row.barcode === barcode);
@@ -988,6 +1015,9 @@ const routes: Array<[string, RegExp, Handler]> = [
     units: UNITS,
     location_kinds: LOCATION_KINDS,
     movement_types: MOVEMENT_TYPES,
+    dashboard_widgets: WIDGET_TYPES,
+    dashboard_tiles: TILE_KEYS,
+    default_dashboard: DEFAULT_LAYOUT,
     revision: store.revision,
   })],
 

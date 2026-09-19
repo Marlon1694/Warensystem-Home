@@ -29,22 +29,25 @@ const js = readFileSync(join(buildDir, 'app.js'), 'utf8');
 
 /**
  * Die Seite wird eingebettet ausgeliefert und bringt deshalb kein eigenes
- * Grundgerüst mit. Die umgebende Seite setzt bereits Randabstände für Notch
- * und Home-Indikator; die App verzichtet hier auf ihre eigenen, damit sie
- * nicht doppelt gezählt werden. Die feste Navigationsleiste hängt am unteren
- * Bildschirmrand und braucht ihren Abstand weiterhin selbst.
+ * Grundgerüst mit. Oben, links und rechts setzt die umgebende Seite bereits
+ * Randabstände; dort verzichtet die App auf ihre eigenen, damit sie nicht
+ * doppelt gezählt werden.
+ *
+ * Unten nicht: die Navigationsleiste hängt am Bildschirmrand und liegt damit
+ * außerhalb dieser Abstände. Sie ist um den Home-Indikator höher, und genau
+ * diesen Betrag muss der Inhalt darüber freihalten – sonst verdeckt die
+ * Leiste die letzte Zeile.
  */
 const embedStyles = `
 :root {
   --safe-top: 0px;
   --safe-left: 0px;
   --safe-right: 0px;
-  --safe-bottom: 0px;
 }
 
 html, body { height: 100%; }
+body { min-height: 100%; }
 .app { min-height: 100%; }
-.nav { padding-bottom: env(safe-area-inset-bottom, 0px); }
 
 .demo-note {
   display: flex;

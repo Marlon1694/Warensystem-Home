@@ -10,6 +10,7 @@ import type {
   Overview,
   Product,
   ProductDetail,
+  RecentMovement,
   Settings,
   ShoppingItem,
   StockBatch,
@@ -30,6 +31,7 @@ export const keys = {
   activity: (days: number) => ['activity', days] as const,
   top: (type: string, days: number) => ['top', type, days] as const,
   waste: (days: number) => ['waste', days] as const,
+  recent: (limit: number) => ['recent', limit] as const,
   settings: ['settings'] as const,
   meta: ['meta'] as const,
 };
@@ -149,6 +151,13 @@ export function useTopItems(type: 'consume' | 'waste', days: number) {
   });
 }
 
+export function useRecentMovements(limit: number) {
+  return useQuery({
+    queryKey: keys.recent(limit),
+    queryFn: () => api.get<RecentMovement[]>('/stats/recent', { limit }),
+  });
+}
+
 export function useWasteReport(days: number) {
   return useQuery({
     queryKey: keys.waste(days),
@@ -170,7 +179,7 @@ function useInvalidateStock() {
   const client = useQueryClient();
 
   return () => {
-    for (const key of ['products', 'product', 'batches', 'expiring', 'shopping', 'overview', 'activity', 'top', 'waste', 'locations']) {
+    for (const key of ['products', 'product', 'batches', 'expiring', 'shopping', 'overview', 'activity', 'top', 'waste', 'recent', 'locations', 'settings']) {
       void client.invalidateQueries({ queryKey: [key] });
     }
   };

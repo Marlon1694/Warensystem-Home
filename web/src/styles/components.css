@@ -624,3 +624,46 @@ button.list__item:active, a.list__item:active { background: var(--surface-sunken
 }
 
 .bar-row__fill--waste { background: var(--chart-series-2); }
+
+/* --------------------------------------------------------------------- */
+/* Übersicht anpassen                                                     */
+/* --------------------------------------------------------------------- */
+
+.widget-edit {
+  padding: var(--space-2);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface-sunken);
+}
+
+.widget-edit__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-bottom: var(--space-2);
+}
+
+.widget-edit__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8125rem;
+  font-weight: 650;
+  color: var(--ink-secondary);
+}
+
+/*
+ * Der Abschnitt bleibt sichtbar, ist aber beim Umsortieren nicht bedienbar –
+ * sonst landet man beim Antippen versehentlich auf einer Artikelseite.
+ */
+.widget-edit__body {
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+/* Der Balken darüber nennt den Abschnitt bereits beim Namen. */
+.widget-edit__body .section-title {
+  display: none;
+}

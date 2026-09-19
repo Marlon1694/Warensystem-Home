@@ -9,11 +9,18 @@ iPhone, iPad, Laptop – greifen auf **denselben Bestand** zu. Keine Cloud, kein
 Konto, keine laufenden Kosten. Auf dem iPhone lässt sie sich über
 „Zum Home-Bildschirm“ wie eine normale App installieren.
 
-| Übersicht | Bestand | Artikel | Einkauf | Auswertung |
-|---|---|---|---|---|
-| ![Übersicht](docs/screenshots/uebersicht.png) | ![Bestand](docs/screenshots/bestand.png) | ![Artikel](docs/screenshots/artikel.png) | ![Einkauf](docs/screenshots/einkauf.png) | ![Auswertung](docs/screenshots/auswertung.png) |
+| Übersicht | Anpassen | Bestand | Artikel | Einkauf | Auswertung |
+|---|---|---|---|---|---|
+| ![Übersicht](docs/screenshots/uebersicht.png) | ![Übersicht anpassen](docs/screenshots/uebersicht-anpassen.png) | ![Bestand](docs/screenshots/bestand.png) | ![Artikel](docs/screenshots/artikel.png) | ![Einkauf](docs/screenshots/einkauf.png) | ![Auswertung](docs/screenshots/auswertung.png) |
 
 ## Was die App kann
+
+**Übersicht nach eigenem Zuschnitt.** Die Startseite ist nicht fest verdrahtet:
+Abschnitte lassen sich hinzufügen, sortieren, einstellen und wieder entfernen.
+Zur Auswahl stehen Kennzahlen (mit frei wählbaren Kacheln), „Bald aufbrauchen“,
+Lagerorte, Einkaufsliste, „Unter Mindestbestand“, letzte Buchungen, der Bestand
+eines einzelnen Lagerorts und freie Notizen. Die Zusammenstellung liegt beim
+Haushalt, nicht beim Gerät – sie sieht also auf iPhone und Laptop gleich aus.
 
 **Lagerorte.** Kühlschrank, Gefrierfach, Vorratskammer, Küche und Keller sind
 vorangelegt. Weitere Orte – Gefriertruhe im Keller, Getränkeregal, Speisekammer –
@@ -343,6 +350,13 @@ Posten kennt Ort, Menge, Haltbarkeit und ob er angebrochen ist.
 Auswertung liest ausschließlich dieses Journal – dadurch bleibt sie auch dann
 richtig, wenn Artikel später archiviert werden.
 
+**Die Übersicht ist Konfiguration, kein Code.** Welche Abschnitte in welcher
+Reihenfolge erscheinen, steht als JSON in den Einstellungen des Haushalts. Der
+Server prüft die Zusammenstellung beim Speichern und wirft Unbekanntes weg –
+der Wert kommt aus einem Browser und wird anschließend von jedem Gerät im
+Haushalt gelesen. Kann die Oberfläche eine gespeicherte Zusammenstellung nicht
+deuten, fällt sie auf die Vorgabe zurück, statt leer zu bleiben.
+
 **Vorbereitet für späteren Abgleich.** Jede Änderung an Stammdaten, Beständen und
 Bewegungen landet über Datenbank-Trigger in der Tabelle `change_log` mit
 fortlaufender Revisionsnummer. Ein späterer Sync für unterwegs kann damit gezielt
@@ -360,9 +374,9 @@ Alle Endpunkte liegen unter `/api` und sprechen JSON.
 | Artikel | `GET/POST /products`, `GET/PATCH/DELETE /products/:id`, `GET /products/by-barcode/:code` |
 | Bestand | `POST /stock/purchase`, `POST /stock/consume`, `POST /stock/move`, `PATCH/DELETE /stock/batches/:id`, `GET /stock/batches`, `GET /stock/expiring` |
 | Einkaufsliste | `GET/POST /shopping`, `PATCH/DELETE /shopping/:id`, `POST /shopping/:id/purchase`, `POST /shopping/clear-done` |
-| Auswertung | `GET /stats/overview`, `/stats/activity`, `/stats/top`, `/stats/waste` |
+| Auswertung | `GET /stats/overview`, `/stats/activity`, `/stats/top`, `/stats/waste`, `/stats/recent` |
 | Barcode | `GET /barcode/:code` |
-| Einstellungen | `GET/PUT /settings`, `GET /settings/meta` |
+| Einstellungen | `GET/PUT /settings`, `GET /settings/meta` (inkl. `dashboard_layout`) |
 | Sicherung | `GET /backup/export`, `POST /backup/import`, `POST /backup/reset-stock` |
 
 Der Server ist bewusst ohne Anmeldung gebaut – er gehört ins eigene Heimnetz und

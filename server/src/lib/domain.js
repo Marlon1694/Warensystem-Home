@@ -9,6 +9,39 @@ export const LOCATION_KINDS = ['fridge', 'freezer', 'pantry', 'cellar', 'kitchen
 
 export const MOVEMENT_TYPES = ['purchase', 'consume', 'waste', 'move', 'correction'];
 
+/** Abschnitte, aus denen sich die Übersicht zusammensetzen lässt. */
+export const DASHBOARD_WIDGETS = [
+  'stats',
+  'expiring',
+  'locations',
+  'shopping',
+  'low_stock',
+  'recent',
+  'location_stock',
+  'note',
+];
+
+/** Kennzahlen, die eine Kachel im Abschnitt "stats" anzeigen kann. */
+export const DASHBOARD_TILES = [
+  'expired',
+  'expiring_soon',
+  'below_min_stock',
+  'products_in_stock',
+  'shopping_open',
+  'batches',
+  'stock_value',
+];
+
+/**
+ * Vorgabe für einen frischen Haushalt: die Zahlen, die täglich zählen, danach
+ * was bald wegmuss, und zuletzt die Lagerorte als Einstieg in den Bestand.
+ */
+export const DEFAULT_DASHBOARD = [
+  { id: 'stats', type: 'stats', options: { tiles: ['expired', 'expiring_soon', 'below_min_stock', 'products_in_stock'] } },
+  { id: 'expiring', type: 'expiring', options: { limit: 10 } },
+  { id: 'locations', type: 'locations', options: {} },
+];
+
 /** Mengen sind Gleitkommazahlen – ohne Rundung entstehen Werte wie 0.30000000000000004. */
 export function round3(value) {
   return Math.round((Number(value) + Number.EPSILON) * 1000) / 1000;
