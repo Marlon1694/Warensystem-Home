@@ -36,10 +36,10 @@ TEMPLATE_STORAGE="${TEMPLATE_STORAGE:-local}"
 ROOTFS_STORAGE="${ROOTFS_STORAGE:-local-lvm}"
 TEMPLATE_PREFIX="${TEMPLATE_PREFIX:-debian-13-standard}"
 START_ON_BOOT="${START_ON_BOOT:-1}"
-# Zusatzfunktionen des Containers. Leer ist Absicht: die Anwendung braucht
-# weder nesting noch fuse, und manche Kernel – vor allem auf ARM-Hosts –
-# verweigern mit nesting den Start.
-FEATURES="${FEATURES:-}"
+# Zusatzfunktionen des Containers. Proxmox weist bei Debian 13 ausdrücklich
+# darauf hin ("Systemd 257 detected. You may need to enable nesting"), weil
+# neuere systemd-Fassungen es im unprivilegierten Container brauchen.
+FEATURES="${FEATURES:-nesting=1}"
 # Mit SKIP_CREATE=1 wird ein bereits vorhandener Container nur bespielt.
 SKIP_CREATE="${SKIP_CREATE:-0}"
 REPO_URL="${REPO_URL:-https://github.com/Marlon1694/Warensystem-Home.git}"
@@ -79,11 +79,11 @@ start_container() {
 
   Was in dieser Reihenfolge zu prüfen ist:
 
-  1. Zusatzfunktionen abschalten. Manche Kernel, vor allem auf ARM-Hosts,
-     kommen mit "nesting" nicht zurecht. Diese Anwendung braucht es nicht:
+  1. Steht oben "Exec format error" beim Aufruf von /sbin/init, passt die
+     Vorlage nicht zur CPU des Hosts. Der Container ist dann nicht zu
+     retten, er muss mit passender Vorlage neu angelegt werden:
 
-         pct set <CTID> --features ''
-         pct start <CTID>
+         pct destroy <CTID>
 
   2. AppArmor. Fehlt es im Kernel, scheitert der Start ohne klare Meldung.
      In /etc/pve/lxc/<CTID>.conf ergänzen:
@@ -92,7 +92,13 @@ start_container() {
 
      danach erneut starten.
 
-  3. Läuft der Container, lässt sich die Installation nachholen, ohne ihn
+  3. Zusatzfunktionen. Debian 13 braucht "nesting" und bekommt es hier auch.
+     Auf sehr alten Kerneln kann das Gegenteil nötig sein:
+
+         pct set <CTID> --features ''
+         pct start <CTID>
+
+  4. Läuft der Container, lässt sich die Installation nachholen, ohne ihn
      neu anzulegen:
 
          CTID=<CTID> SKIP_CREATE=1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/Marlon1694/Warensystem-Home/HEAD/deploy/proxmox-lxc.sh)"
@@ -188,15 +194,31 @@ if [ "$SKIP_CREATE" != '1' ]; then
 log 'Suche eine passende Container-Vorlage …'
 pveam update >/dev/null 2>&1 || warn 'Die Vorlagenliste konnte nicht aktualisiert werden – nutze den vorhandenen Stand.'
 
-TEMPLATE="$(pveam available --section system 2>/dev/null \
-  | awk -v prefix="$TEMPLATE_PREFIX" '$2 ~ prefix {print $2}' | sort -V | tail -1)"
-
-if [ -z "$TEMPLATE" ]; then
-  # Ältere Proxmox-Stände kennen debian-13 noch nicht.
-  TEMPLATE="$(pveam available --section system 2>/dev/null \
-    | awk '$2 ~ /debian-12-standard/ {print $2}' | sort -V | tail -1)"
+# Die Vorlagenliste enthält auch Vorlagen für andere Architekturen. Eine
+# arm64-Vorlage lässt sich auf einem x86-Host anstandslos anlegen – beim Start
+# scheitert dann aber /sbin/init mit "Exec format error". Deshalb wird die
+# Auswahl hier auf die Architektur des Hosts eingegrenzt.
+HOST_ARCH="$(dpkg --print-architecture 2>/dev/null || true)"
+if [ -z "$HOST_ARCH" ]; then
+  case "$(uname -m)" in
+    x86_64)  HOST_ARCH='amd64' ;;
+    aarch64) HOST_ARCH='arm64' ;;
+    *)       HOST_ARCH="$(uname -m)" ;;
+  esac
 fi
-[ -n "$TEMPLATE" ] || die 'Keine Debian-Vorlage gefunden. Mit TEMPLATE_PREFIX eine andere wählen.'
+
+find_template() {
+  pveam available --section system 2>/dev/null \
+    | awk -v prefix="$1" -v arch="_${HOST_ARCH}." '$2 ~ prefix && index($2, arch) > 0 {print $2}' \
+    | sort -V | tail -1
+}
+
+TEMPLATE="$(find_template "$TEMPLATE_PREFIX")"
+# Ältere Proxmox-Stände kennen debian-13 noch nicht.
+[ -n "$TEMPLATE" ] || TEMPLATE="$(find_template 'debian-12-standard')"
+[ -n "$TEMPLATE" ] || die "Keine Debian-Vorlage für ${HOST_ARCH} gefunden. Mit TEMPLATE_PREFIX eine andere wählen."
+
+log "Architektur des Hosts: ${HOST_ARCH}"
 
 if ! pveam list "$TEMPLATE_STORAGE" 2>/dev/null | grep -q "$TEMPLATE"; then
   log "Lade die Vorlage $TEMPLATE herunter …"
@@ -226,6 +248,7 @@ cat <<PLAN
     ID          ${CTID}
     Name        ${CT_HOSTNAME}
     Vorlage     ${TEMPLATE}
+    Architektur ${HOST_ARCH}
     Kerne       ${CORES}
     Arbeitssp.  ${RAM_MB} MB (+ ${SWAP_MB} MB Swap)
     Festplatte  ${DISK_GB} GB auf ${ROOTFS_STORAGE}

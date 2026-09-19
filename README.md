@@ -145,7 +145,7 @@ an den Container bindest (FRITZ!Box: *Heimnetz → Netzwerk → Gerätedetails �
 | `TEMPLATE_STORAGE` | `local` | Speicher für die Container-Vorlage |
 | `PORT` | `4000` | Port der Anwendung |
 | `ENABLE_TLS` | `yes` | Zertifikat gleich mit erzeugen |
-| `FEATURES` | leer | Zusatzfunktionen des Containers, z. B. `nesting=1` |
+| `FEATURES` | `nesting=1` | Zusatzfunktionen des Containers; `FEATURES=` schaltet sie ab |
 | `SKIP_CREATE` | `0` | `1` bespielt einen bereits vorhandenen Container |
 
 Danach:
@@ -166,9 +166,20 @@ das Skript zeigt deshalb automatisch die ausführliche Fassung. Der Reihe nach:
 pct start <CTID> --debug        # die eigentliche Meldung
 ```
 
-**Zusatzfunktionen.** Manche Kernel, vor allem auf ARM-Hosts, kommen mit
-`nesting` nicht zurecht. Die Anwendung braucht es nicht, seit Fassung 1.1 wird
-es auch nicht mehr gesetzt. Bei einem älteren Container:
+**Falsche Architektur.** Steht in der Meldung `Exec format error` beim Aufruf
+von `/sbin/init`, passt die Vorlage nicht zur CPU des Hosts – eine
+arm64-Vorlage lässt sich auf einem x86-Host anlegen, aber nicht starten. Das
+Skript grenzt die Vorlagenauswahl auf die Architektur des Hosts ein und nennt
+sie beim Anlegen. Ein so entstandener Container ist nicht zu retten:
+
+```bash
+pct destroy <CTID>       # danach neu anlegen
+```
+
+**Zusatzfunktionen.** Debian 13 braucht `nesting` – Proxmox weist beim Anlegen
+selbst darauf hin („Systemd 257 detected. You may need to enable nesting“).
+Das Skript setzt es deshalb. Auf sehr alten Kerneln kann das Gegenteil nötig
+sein:
 
 ```bash
 pct set <CTID> --features ''
