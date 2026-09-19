@@ -352,21 +352,32 @@ done
 # ---------------------------------------------------------------------------
 
 log 'Bereite den Container vor …'
-pct exec "$CTID" -- bash -c 'export DEBIAN_FRONTEND=noninteractive; apt-get update -qq && apt-get install -y -qq curl ca-certificates >/dev/null'
+pct exec "$CTID" -- env LC_ALL=C.UTF-8 LANG=C.UTF-8 bash -c \
+  'export DEBIAN_FRONTEND=noninteractive; apt-get update -qq && apt-get install -y -qq curl ca-certificates >/dev/null'
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || true)"
+# Beim Aufruf über bash -c "$(curl …)" gibt es keine Skriptdatei, BASH_SOURCE
+# ist dann leer. Ohne die Prüfung meldet set -u eine ungebundene Variable, und
+# ein leerer Pfad würde auf das Arbeitsverzeichnis zeigen – dort könnte eine
+# alte install.sh aus einem früheren Lauf liegen.
+if [ -n "${BASH_SOURCE[0]:-}" ] && [ -f "${BASH_SOURCE[0]}" ]; then
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+else
+  SCRIPT_DIR=''
+fi
 
 if [ -n "$SCRIPT_DIR" ] && [ -f "${SCRIPT_DIR}/install.sh" ]; then
   log 'Übertrage das Installationsskript …'
   pct push "$CTID" "${SCRIPT_DIR}/install.sh" /root/install.sh --perms 755
 else
   log 'Lade das Installationsskript in den Container …'
-  pct exec "$CTID" -- bash -c \
+  pct exec "$CTID" -- env LC_ALL=C.UTF-8 LANG=C.UTF-8 bash -c \
     "curl -fsSL https://raw.githubusercontent.com/Marlon1694/Warensystem-Home/HEAD/deploy/install.sh -o /root/install.sh && chmod 755 /root/install.sh"
 fi
 
 log 'Installiere Warensystem Home …'
 pct exec "$CTID" -- env \
+  LC_ALL=C.UTF-8 \
+  LANG=C.UTF-8 \
   REPO_URL="$REPO_URL" \
   BRANCH="$BRANCH" \
   PORT="$PORT" \
