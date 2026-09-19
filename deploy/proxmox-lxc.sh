@@ -323,7 +323,26 @@ for attempt in $(seq 1 30); do
     warn "Die Adresse steht, aber Namen werden nicht aufgelöst."
     warn "Im Container eingetragen:"
     pct exec "$CTID" -- cat /etc/resolv.conf 2>/dev/null | sed 's/^/    /' >&2 || true
-    die "Bitte den Container mit NAMESERVER=<Adresse des DNS-Servers> neu anlegen, z. B. NAMESERVER=${GATEWAY:-192.168.1.1}"
+
+    # Begrenztes Here-Dokument: die Zeile mit $(…) soll angezeigt und nicht
+    # ausgeführt werden. Nummer und DNS-Server werden danach eingesetzt.
+    cat <<'HINT' | sed -e "s|<CTID>|${CTID}|g" -e "s|<DNS>|${GATEWAY:-192.168.1.1}|g" >&2
+
+  Der Container hat die DNS-Einstellungen des Proxmox-Hosts übernommen. Nutzt
+  der Host einen Resolver, den der Container nicht erreicht – etwa Tailscale
+  unter 100.100.100.100 – bleibt die Auflösung aus.
+
+  Das lässt sich beheben, ohne den Container neu anzulegen:
+
+      pct set <CTID> --nameserver <DNS>
+      pct reboot <CTID>
+
+  Danach die Installation nachholen:
+
+      CTID=<CTID> SKIP_CREATE=1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/Marlon1694/Warensystem-Home/HEAD/deploy/proxmox-lxc.sh)"
+
+HINT
+    die 'Im Container werden keine Namen aufgelöst.'
   fi
   sleep 2
 done

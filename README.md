@@ -201,6 +201,26 @@ CTID=<CTID> SKIP_CREATE=1 \
   bash -c "$(curl -fsSL https://raw.githubusercontent.com/Marlon1694/Warensystem-Home/HEAD/deploy/proxmox-lxc.sh)"
 ```
 
+#### Wenn Namen nicht aufgelöst werden
+
+Bricht der Lauf mit „Die Adresse steht, aber Namen werden nicht aufgelöst“ ab,
+hat der Container die DNS-Einstellungen des Proxmox-Hosts übernommen. Nutzt der
+Host einen Resolver, den der Container nicht erreicht – etwa Tailscale unter
+`100.100.100.100` oder einen Resolver in einem anderen Netz – bleibt die
+Auflösung aus. Das Skript zeigt in dem Fall die `resolv.conf` des Containers.
+
+Ohne neu anzulegen zu beheben:
+
+```bash
+pct set <CTID> --nameserver 192.168.1.1     # meist die Adresse des Routers
+pct reboot <CTID>
+
+CTID=<CTID> SKIP_CREATE=1 \
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/Marlon1694/Warensystem-Home/HEAD/deploy/proxmox-lxc.sh)"
+```
+
+Beim Anlegen lässt sich das gleich mitgeben: `NAMESERVER=192.168.1.1`.
+
 #### Adresse eines bestehenden Containers ändern
 
 Läuft der Container schon mit DHCP, muss er dafür nicht neu angelegt werden:
