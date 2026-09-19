@@ -198,13 +198,20 @@ pveam update >/dev/null 2>&1 || warn 'Die Vorlagenliste konnte nicht aktualisier
 # arm64-Vorlage lässt sich auf einem x86-Host anstandslos anlegen – beim Start
 # scheitert dann aber /sbin/init mit "Exec format error". Deshalb wird die
 # Auswahl hier auf die Architektur des Hosts eingegrenzt.
-HOST_ARCH="$(dpkg --print-architecture 2>/dev/null || true)"
-if [ -z "$HOST_ARCH" ]; then
-  case "$(uname -m)" in
-    x86_64)  HOST_ARCH='amd64' ;;
-    aarch64) HOST_ARCH='arm64' ;;
-    *)       HOST_ARCH="$(uname -m)" ;;
-  esac
+# Maßgeblich ist der Kernel, denn er führt die Programme im Container aus.
+# Auf einem Raspberry Pi kann ein 64-Bit-Kernel mit einem 32-Bit-System
+# darüber laufen – dann widerspricht dpkg dem Kernel, und dpkg läge falsch.
+case "$(uname -m)" in
+  x86_64)           HOST_ARCH='amd64' ;;
+  aarch64|arm64)    HOST_ARCH='arm64' ;;
+  armv7l|armv6l)    HOST_ARCH='armhf' ;;
+  i386|i486|i686)   HOST_ARCH='i386' ;;
+  *)                HOST_ARCH="$(dpkg --print-architecture 2>/dev/null || uname -m)" ;;
+esac
+
+DPKG_ARCH="$(dpkg --print-architecture 2>/dev/null || true)"
+if [ -n "$DPKG_ARCH" ] && [ "$DPKG_ARCH" != "$HOST_ARCH" ]; then
+  warn "Kernel meldet ${HOST_ARCH}, das System darüber ${DPKG_ARCH}. Maßgeblich ist der Kernel."
 fi
 
 find_template() {
