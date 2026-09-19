@@ -18,6 +18,30 @@ interface SheetProps {
 export function Sheet({ title, description, open, onClose, children, footer }: SheetProps) {
   const panelRef = useRef<HTMLDivElement>(null);
 
+  /**
+   * Fokus in den Dialog holen und den Hintergrund festhalten – beides hängt
+   * allein am Öffnen.
+   *
+   * onClose darf hier nicht in die Abhängigkeiten: die aufrufenden Seiten
+   * übergeben eine direkt geschriebene Funktion, die bei jedem Neuzeichnen
+   * eine neue ist. Beim Tippen zeichnet die Seite nach jedem Zeichen neu,
+   * der Effekt liefe erneut und zöge den Fokus aus dem Eingabefeld – auf dem
+   * iPhone schließt sich dabei jedes Mal die Tastatur.
+   */
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    panelRef.current?.focus();
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
+
+  // Der Escape-Griff darf sich an ein neues onClose binden – das rührt den
+  // Fokus nicht an.
   useEffect(() => {
     if (!open) return undefined;
 
@@ -26,16 +50,7 @@ export function Sheet({ title, description, open, onClose, children, footer }: S
     };
 
     document.addEventListener('keydown', onKeyDown);
-    // Hintergrund nicht mitscrollen lassen, solange der Dialog offen ist.
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    panelRef.current?.focus();
-
-    return () => {
-      document.removeEventListener('keydown', onKeyDown);
-      document.body.style.overflow = previousOverflow;
-    };
+    return () => document.removeEventListener('keydown', onKeyDown);
   }, [open, onClose]);
 
   if (!open) return null;
