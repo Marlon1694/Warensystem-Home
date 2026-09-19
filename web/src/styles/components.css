@@ -667,3 +667,41 @@ button.list__item:active, a.list__item:active { background: var(--surface-sunken
 .widget-edit__body .section-title {
   display: none;
 }
+
+/* --------------------------------------------------------------------- */
+/* Reihenfolge ändern                                                     */
+/* --------------------------------------------------------------------- */
+
+/*
+ * Die beiden Pfeile stehen übereinander statt nebeneinander: nebeneinander
+ * kosten sie rund 40 px mehr Breite, und die Namen der Warengruppen brechen
+ * dann auf Handybreite ab. Gestapelt passen sie in die Höhe einer Zeile.
+ */
+.reorder {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.reorder__btn {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  min-height: 26px;
+  padding: 0;
+  font-size: 0.8125rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink-secondary);
+  line-height: 1;
+}
+
+.reorder__btn:hover:not(:disabled) { background: var(--surface-hover); }
+.reorder__btn:active:not(:disabled) { background: var(--surface-sunken); }
+
+.reorder__btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}

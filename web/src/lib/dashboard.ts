@@ -4,6 +4,8 @@
  * und damit auf allen Geräten gleich.
  */
 
+import { moveItem } from './list';
+
 export type WidgetType =
   | 'stats'
   | 'expiring'
@@ -160,13 +162,7 @@ export function createWidget(type: WidgetType, options: Record<string, unknown> 
 }
 
 export function moveWidget(widgets: Widget[], index: number, direction: -1 | 1): Widget[] {
-  const target = index + direction;
-  if (target < 0 || target >= widgets.length) return widgets;
-
-  const next = [...widgets];
-  const [moved] = next.splice(index, 1);
-  next.splice(target, 0, moved as Widget);
-  return next;
+  return moveItem(widgets, index, direction);
 }
 
 /**

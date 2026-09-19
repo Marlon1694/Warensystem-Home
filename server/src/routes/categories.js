@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { db } from '../db/index.js';
-import { deleteRow, insertRow, requireRow, updateRow } from '../lib/repository.js';
+import { db, transaction } from '../db/index.js';
+import { deleteRow, insertRow, now, requireRow, updateRow } from '../lib/repository.js';
 import { optionalInteger, optionalText, parseId, requireText } from '../lib/validate.js';
 import { HttpError } from '../lib/http.js';
 
@@ -35,6 +35,34 @@ categoriesRouter.post('/', (req, res) => {
   });
 
   res.status(201).json(created);
+});
+
+/**
+ * Reihenfolge festlegen. Die Oberfläche schickt alle IDs in der gewünschten
+ * Folge; hier werden daraus saubere Abstände (10, 20, 30 …), sodass sich
+ * später bequem etwas dazwischenschieben lässt.
+ */
+categoriesRouter.put('/order', (req, res) => {
+  const raw = req.body?.ids;
+  if (!Array.isArray(raw) || raw.length === 0) {
+    throw HttpError.badRequest('ids muss eine nicht leere Liste von IDs sein');
+  }
+
+  const ids = raw.map((id) => parseId(id, 'ids'));
+  if (new Set(ids).size !== ids.length) throw HttpError.badRequest('Doppelte IDs in der Reihenfolge');
+
+  transaction((handle) => {
+    const statement = handle.prepare('UPDATE categories SET sort_order = ?, updated_at = ? WHERE id = ?');
+
+    ids.forEach((id, index) => {
+      // Innerhalb der Transaktion prüfen: bei einer unbekannten ID wird alles
+      // zurückgerollt, statt eine halb umsortierte Liste zu hinterlassen.
+      const result = statement.run((index + 1) * 10, now(), id);
+      if (result.changes === 0) throw HttpError.badRequest(`Unbekannte ID: ${id}`);
+    });
+  });
+
+  res.json({ ordered: ids.length });
 });
 
 categoriesRouter.patch('/:id', (req, res) => {

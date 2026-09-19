@@ -11,12 +11,15 @@ import {
   useDeleteLocation,
   useImportBackup,
   useLocations,
+  useReorderCategories,
+  useReorderLocations,
   useSaveCategory,
   useSaveLocation,
   useSaveSettings,
   useSettings,
 } from '../api/hooks';
 import { LOCATION_LABELS } from '../lib/format';
+import { moveItem } from '../lib/list';
 import { useTheme, type ThemePreference } from '../lib/theme';
 import type { Category, LocationKind, StorageLocation } from '../types';
 
@@ -42,6 +45,8 @@ export function SettingsPage() {
   const saveCategory = useSaveCategory();
   const deleteCategory = useDeleteCategory();
   const importBackup = useImportBackup();
+  const reorderLocations = useReorderLocations();
+  const reorderCategories = useReorderCategories();
 
   const [householdName, setHouseholdName] = useState('');
   const [warnDays, setWarnDays] = useState('5');
@@ -65,6 +70,18 @@ export function SettingsPage() {
     } catch (error) {
       toast.warn(error instanceof Error ? error.message : 'Speichern fehlgeschlagen');
     }
+  }
+
+  /** Verschiebt einen Eintrag und schickt die vollständige neue Folge. */
+  function move<T extends { id: number }>(
+    rows: T[] | undefined,
+    index: number,
+    direction: -1 | 1,
+    save: (ids: number[]) => void,
+  ) {
+    if (!rows) return;
+    const next = moveItem(rows, index, direction);
+    if (next !== rows) save(next.map((row) => row.id));
   }
 
   async function persistLocation() {
@@ -203,7 +220,7 @@ export function SettingsPage() {
           </div>
 
           <ul className="list">
-            {locations.data?.map((location) => (
+            {locations.data?.map((location, index) => (
               <li key={location.id} className="list__item">
                 <LocationIcon kind={location.kind} size={20} style={{ color: 'var(--ink-secondary)' }} />
                 <button
@@ -214,9 +231,20 @@ export function SettingsPage() {
                 >
                   <div className="list__title">{location.name}</div>
                   <div className="list__meta">
-                    {LOCATION_LABELS[location.kind]} · {location.article_count} Artikel
+                    <span className="truncate">
+                      {LOCATION_LABELS[location.kind]} · {location.article_count} Artikel
+                    </span>
                   </div>
                 </button>
+
+                <ReorderButtons
+                  label={location.name}
+                  index={index}
+                  count={locations.data?.length ?? 0}
+                  onMove={(direction) =>
+                    move(locations.data, index, direction, reorderLocations.mutate)}
+                />
+
                 <button
                   type="button"
                   className="btn btn--ghost btn--icon"
@@ -244,7 +272,7 @@ export function SettingsPage() {
           </div>
 
           <ul className="list">
-            {categories.data?.map((category) => (
+            {categories.data?.map((category, index) => (
               <li key={category.id} className="list__item">
                 <CategoryDot color={category.color} />
                 <button
@@ -256,6 +284,15 @@ export function SettingsPage() {
                   <div className="list__title">{category.name}</div>
                   <div className="list__meta">{category.article_count} Artikel</div>
                 </button>
+
+                <ReorderButtons
+                  label={category.name}
+                  index={index}
+                  count={categories.data?.length ?? 0}
+                  onMove={(direction) =>
+                    move(categories.data, index, direction, reorderCategories.mutate)}
+                />
+
                 <button
                   type="button"
                   className="btn btn--ghost btn--icon"
@@ -404,5 +441,41 @@ export function SettingsPage() {
         </div>
       </Sheet>
     </Layout>
+  );
+}
+
+/** Zwei Pfeile, mit denen ein Eintrag eine Position wandert. */
+function ReorderButtons({
+  label,
+  index,
+  count,
+  onMove,
+}: {
+  label: string;
+  index: number;
+  count: number;
+  onMove: (direction: -1 | 1) => void;
+}) {
+  return (
+    <div className="reorder">
+      <button
+        type="button"
+        className="reorder__btn"
+        disabled={index === 0}
+        onClick={() => onMove(-1)}
+      >
+        <span aria-hidden="true">↑</span>
+        <span className="visually-hidden">{label} nach oben</span>
+      </button>
+      <button
+        type="button"
+        className="reorder__btn"
+        disabled={index === count - 1}
+        onClick={() => onMove(1)}
+      >
+        <span aria-hidden="true">↓</span>
+        <span className="visually-hidden">{label} nach unten</span>
+      </button>
+    </div>
   );
 }

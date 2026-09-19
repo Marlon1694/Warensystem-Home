@@ -24,7 +24,9 @@ Haushalt, nicht beim Gerät – sie sieht also auf iPhone und Laptop gleich aus.
 
 **Lagerorte.** Kühlschrank, Gefrierfach, Vorratskammer, Küche und Keller sind
 vorangelegt. Weitere Orte – Gefriertruhe im Keller, Getränkeregal, Speisekammer –
-lassen sich jederzeit ergänzen und mit passendem Symbol versehen.
+lassen sich jederzeit ergänzen und mit passendem Symbol versehen. Lagerorte und
+Warengruppen lassen sich in den Einstellungen in die eigene Reihenfolge bringen;
+sie gilt überall, wo die Listen auftauchen.
 
 **Bestand nach Posten.** Ein Artikel kann gleichzeitig an mehreren Orten und mit
 unterschiedlichen Haltbarkeitsdaten liegen. Zwei Packungen Milch mit
@@ -436,8 +438,8 @@ Alle Endpunkte liegen unter `/api` und sprechen JSON.
 
 | Bereich | Endpunkte |
 |---|---|
-| Lagerorte | `GET/POST /locations`, `PATCH/DELETE /locations/:id` |
-| Warengruppen | `GET/POST /categories`, `PATCH/DELETE /categories/:id` |
+| Lagerorte | `GET/POST /locations`, `PATCH/DELETE /locations/:id`, `PUT /locations/order` |
+| Warengruppen | `GET/POST /categories`, `PATCH/DELETE /categories/:id`, `PUT /categories/order` |
 | Artikel | `GET/POST /products`, `GET/PATCH/DELETE /products/:id`, `GET /products/by-barcode/:code` |
 | Bestand | `POST /stock/purchase`, `POST /stock/consume`, `POST /stock/move`, `PATCH/DELETE /stock/batches/:id`, `GET /stock/batches`, `GET /stock/expiring` |
 | Einkaufsliste | `GET/POST /shopping`, `PATCH/DELETE /shopping/:id`, `POST /shopping/:id/purchase`, `POST /shopping/clear-done` |

@@ -294,6 +294,47 @@ export function useDeleteLocation() {
     api.del(`/locations/${id}`, { force: force ? '1' : undefined }));
 }
 
+/**
+ * Reihenfolge einer Liste speichern. Die neue Folge wird sofort angezeigt und
+ * erst danach bestätigt – sonst hinkt die Liste bei jedem Tippen hinterher.
+ * Schlägt das Speichern fehl, kehrt die alte Folge zurück.
+ */
+function useReorder<T extends { id: number }>(path: string, queryKey: readonly unknown[]) {
+  const client = useQueryClient();
+
+  return useMutation<unknown, Error, number[], { previous?: T[] }>({
+    mutationFn: (ids) => api.put(`${path}/order`, { ids }),
+    onMutate: async (ids) => {
+      await client.cancelQueries({ queryKey });
+      const previous = client.getQueryData<T[]>(queryKey);
+
+      if (previous) {
+        const byId = new Map(previous.map((row) => [row.id, row]));
+        client.setQueryData(
+          queryKey,
+          ids.map((id) => byId.get(id)).filter((row): row is T => row !== undefined),
+        );
+      }
+
+      return { previous };
+    },
+    onError: (_error, _ids, context) => {
+      if (context?.previous) client.setQueryData(queryKey, context.previous);
+    },
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey });
+    },
+  });
+}
+
+export function useReorderCategories() {
+  return useReorder<Category>('/categories', keys.categories);
+}
+
+export function useReorderLocations() {
+  return useReorder<StorageLocation>('/locations', keys.locations);
+}
+
 export function useSaveCategory() {
   return useStockMutation(({ id, ...input }: { id?: number } & Record<string, unknown>) =>
     id ? api.patch(`/categories/${id}`, input) : api.post('/categories', input));

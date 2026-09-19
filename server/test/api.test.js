@@ -72,6 +72,55 @@ describe('Stammdaten', () => {
   });
 });
 
+describe('Reihenfolge von Lagerorten und Warengruppen', () => {
+  it('sortiert Warengruppen um und behält die neue Folge', async () => {
+    const before = (await api('GET', '/api/categories')).body;
+    const reversed = [...before].reverse().map((row) => row.id);
+
+    const saved = await api('PUT', '/api/categories/order', { ids: reversed });
+    assert.equal(saved.status, 200);
+    assert.equal(saved.body.ordered, reversed.length);
+
+    const after = (await api('GET', '/api/categories')).body;
+    assert.deepEqual(after.map((row) => row.id), reversed);
+
+    // Zurücksortieren, damit die übrigen Tests ihre gewohnte Folge sehen.
+    await api('PUT', '/api/categories/order', { ids: before.map((row) => row.id) });
+  });
+
+  it('sortiert auch Lagerorte um', async () => {
+    const before = (await api('GET', '/api/locations')).body;
+    const moved = [before[2], before[0], before[1], ...before.slice(3)].map((row) => row.id);
+
+    await api('PUT', '/api/locations/order', { ids: moved });
+
+    const after = (await api('GET', '/api/locations')).body;
+    assert.deepEqual(after.map((row) => row.id), moved);
+
+    await api('PUT', '/api/locations/order', { ids: before.map((row) => row.id) });
+  });
+
+  it('weist doppelte IDs ab', async () => {
+    const { status } = await api('PUT', '/api/categories/order', { ids: [1, 1, 2] });
+    assert.equal(status, 400);
+  });
+
+  it('lässt bei einer unbekannten ID die alte Reihenfolge unverändert', async () => {
+    const before = (await api('GET', '/api/categories')).body.map((row) => row.id);
+
+    const { status } = await api('PUT', '/api/categories/order', { ids: [...before, 9999] });
+    assert.equal(status, 400);
+
+    const after = (await api('GET', '/api/categories')).body.map((row) => row.id);
+    assert.deepEqual(after, before, 'Die Reihenfolge darf sich bei einem Fehler nicht ändern');
+  });
+
+  it('weist eine leere Liste ab', async () => {
+    const { status } = await api('PUT', '/api/locations/order', { ids: [] });
+    assert.equal(status, 400);
+  });
+});
+
 describe('Bestandsführung', () => {
   let fridgeId;
   let freezerId;

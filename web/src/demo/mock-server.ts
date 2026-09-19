@@ -608,6 +608,30 @@ const routes: Array<[string, RegExp, Handler]> = [
     return null;
   }],
 
+  ['PUT', /^\/(locations|categories)\/order$/, (parts, body) => {
+    const table = parts[0] === 'locations' ? 'locations' : 'categories';
+    const rows = table === 'locations' ? store.locations : store.categories;
+
+    const ids: number[] = Array.isArray(body.ids) ? body.ids.map(Number) : [];
+    if (ids.length === 0) throw new ApiFailure(400, 'ids muss eine nicht leere Liste von IDs sein');
+    if (new Set(ids).size !== ids.length) throw new ApiFailure(400, 'Doppelte IDs in der Reihenfolge');
+
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    const ordered = ids.map((id) => {
+      const row = byId.get(id);
+      if (!row) throw new ApiFailure(400, `Unbekannte ID: ${id}`);
+      return row;
+    });
+
+    ordered.forEach((row, index) => { row.sort_order = (index + 1) * 10; });
+    const rest = rows.filter((row) => !ids.includes(row.id));
+
+    if (table === 'locations') store.locations = [...ordered, ...rest];
+    else store.categories = [...ordered, ...rest];
+
+    return { ordered: ids.length };
+  }],
+
   ['GET', /^\/categories$/, () => store.categories.map((category) => ({
     ...category,
     article_count: store.products.filter((row) => row.category_id === category.id && row.archived === 0).length,
