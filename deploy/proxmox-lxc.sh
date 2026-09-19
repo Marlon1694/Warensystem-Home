@@ -67,6 +67,10 @@ fi
 
 TEMPLATE_REF="${TEMPLATE_STORAGE}:vztmpl/${TEMPLATE}"
 
+# Mit TEMPLATE_PREFIX lässt sich auch eine Ubuntu-Vorlage wählen; der ostype
+# muss dann dazu passen, sonst richtet Proxmox das Netzwerk falsch ein.
+OSTYPE="$(printf '%s' "$TEMPLATE" | grep -oE '^[a-z]+' || echo debian)"
+
 # ---------------------------------------------------------------------------
 # Container anlegen
 # ---------------------------------------------------------------------------
@@ -91,6 +95,15 @@ cat <<PLAN
 
 PLAN
 
+cleanup_hint() {
+  local code=$?
+  [ "$code" -eq 0 ] && return 0
+  warn "Abbruch. Der Container $CTID wurde bereits angelegt."
+  warn "Aufräumen mit:  pct stop $CTID; pct destroy $CTID"
+  warn "Oder erneut versuchen mit:  pct exec $CTID -- bash /root/install.sh"
+  return "$code"
+}
+
 log "Lege Container $CTID an …"
 pct create "$CTID" "$TEMPLATE_REF" \
   --hostname "$CT_HOSTNAME" \
@@ -102,9 +115,11 @@ pct create "$CTID" "$TEMPLATE_REF" \
   --features nesting=1 \
   --unprivileged 1 \
   --onboot "$START_ON_BOOT" \
-  --ostype debian \
+  --ostype "$OSTYPE" \
   --description 'Warensystem Home – Haushalts-Warenwirtschaft' \
   >/dev/null
+
+trap cleanup_hint EXIT
 
 log 'Starte den Container …'
 pct start "$CTID"
@@ -153,6 +168,8 @@ pct exec "$CTID" -- env \
 # ---------------------------------------------------------------------------
 # Ergebnis
 # ---------------------------------------------------------------------------
+
+trap - EXIT
 
 CT_IP="$(pct exec "$CTID" -- hostname -I 2>/dev/null | awk '{print $1}')"
 SCHEME='http'
