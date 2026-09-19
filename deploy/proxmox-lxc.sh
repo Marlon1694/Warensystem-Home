@@ -36,6 +36,12 @@ TEMPLATE_STORAGE="${TEMPLATE_STORAGE:-local}"
 ROOTFS_STORAGE="${ROOTFS_STORAGE:-local-lvm}"
 TEMPLATE_PREFIX="${TEMPLATE_PREFIX:-debian-13-standard}"
 START_ON_BOOT="${START_ON_BOOT:-1}"
+# Zusatzfunktionen des Containers. Leer ist Absicht: die Anwendung braucht
+# weder nesting noch fuse, und manche Kernel – vor allem auf ARM-Hosts –
+# verweigern mit nesting den Start.
+FEATURES="${FEATURES:-}"
+# Mit SKIP_CREATE=1 wird ein bereits vorhandener Container nur bespielt.
+SKIP_CREATE="${SKIP_CREATE:-0}"
 REPO_URL="${REPO_URL:-https://github.com/Marlon1694/Warensystem-Home.git}"
 BRANCH="${BRANCH:-}"
 PORT="${PORT:-4000}"
@@ -50,7 +56,67 @@ command -v pct   >/dev/null || die 'pct wurde nicht gefunden. Dieses Skript geh�
 command -v pveam >/dev/null || die 'pveam wurde nicht gefunden.'
 
 CTID="${CTID:-$(pvesh get /cluster/nextid)}"
-pct status "$CTID" >/dev/null 2>&1 && die "Die ID $CTID ist bereits vergeben. Mit CTID=<Nummer> eine andere wählen."
+
+# Startet den Container und zeigt bei einem Fehlschlag die ausführliche
+# Meldung von LXC. "Failed to spawn container" allein nennt die Ursache nicht,
+# die steht erst in der Debug-Ausgabe.
+start_container() {
+  if [ "$(pct status "$CTID" 2>/dev/null)" = 'status: running' ]; then
+    log "Container $CTID läuft bereits."
+    return 0
+  fi
+
+  log 'Starte den Container …'
+  pct start "$CTID" && return 0
+
+  warn 'Der Container ließ sich nicht starten. Ausführliche Meldung:'
+  pct start "$CTID" --debug 2>&1 | tail -25 | sed 's/^/    /' >&2 || true
+
+  # Das Here-Dokument ist bewusst mit Anführungszeichen begrenzt: der Hinweis
+  # enthält eine Befehlszeile mit $(…), die hier angezeigt und nicht
+  # ausgeführt werden soll. Die Container-Nummer wird danach eingesetzt.
+  cat <<'HINT' | sed "s|<CTID>|${CTID}|g" >&2
+
+  Was in dieser Reihenfolge zu prüfen ist:
+
+  1. Zusatzfunktionen abschalten. Manche Kernel, vor allem auf ARM-Hosts,
+     kommen mit "nesting" nicht zurecht. Diese Anwendung braucht es nicht:
+
+         pct set <CTID> --features ''
+         pct start <CTID>
+
+  2. AppArmor. Fehlt es im Kernel, scheitert der Start ohne klare Meldung.
+     In /etc/pve/lxc/<CTID>.conf ergänzen:
+
+         lxc.apparmor.profile: unconfined
+
+     danach erneut starten.
+
+  3. Läuft der Container, lässt sich die Installation nachholen, ohne ihn
+     neu anzulegen:
+
+         CTID=<CTID> SKIP_CREATE=1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/Marlon1694/Warensystem-Home/HEAD/deploy/proxmox-lxc.sh)"
+
+HINT
+  die 'Der Container wurde angelegt, konnte aber nicht gestartet werden.'
+}
+
+cleanup_hint() {
+  local code=$?
+  [ "$code" -eq 0 ] && return 0
+  warn "Abbruch. Der Container $CTID wurde bereits angelegt."
+  warn "Aufräumen mit:  pct stop $CTID; pct destroy $CTID"
+  warn "Oder erneut versuchen mit:  pct exec $CTID -- bash /root/install.sh"
+  return "$code"
+}
+
+if [ "$SKIP_CREATE" = '1' ]; then
+  pct status "$CTID" >/dev/null 2>&1 \
+    || die "Container $CTID gibt es nicht. SKIP_CREATE=1 bespielt nur einen vorhandenen Container."
+else
+  pct status "$CTID" >/dev/null 2>&1 \
+    && die "Die ID $CTID ist bereits vergeben. Mit CTID=<Nummer> eine andere wählen, oder mit SKIP_CREATE=1 diesen Container bespielen."
+fi
 
 # ---------------------------------------------------------------------------
 # Feste IP-Adresse prüfen
@@ -79,7 +145,7 @@ ipv4_to_int() {
   echo $(( ($1 << 24) + ($2 << 16) + ($3 << 8) + $4 ))
 }
 
-if [ "$IPV4" != 'dhcp' ]; then
+if [ "$IPV4" != 'dhcp' ] && [ "$SKIP_CREATE" != '1' ]; then
   case "$IPV4" in
     */*) ;;
     *) die "IPV4 braucht die Netzmaske: IPV4=${IPV4}/24 statt IPV4=${IPV4}" ;;
@@ -114,6 +180,11 @@ fi
 # Vorlage
 # ---------------------------------------------------------------------------
 
+if [ "$SKIP_CREATE" = '1' ]; then
+  log "Überspringe das Anlegen – bespiele den vorhandenen Container $CTID."
+fi
+
+if [ "$SKIP_CREATE" != '1' ]; then
 log 'Suche eine passende Container-Vorlage …'
 pveam update >/dev/null 2>&1 || warn 'Die Vorlagenliste konnte nicht aktualisiert werden – nutze den vorhandenen Stand.'
 
@@ -162,19 +233,14 @@ cat <<PLAN
 
 PLAN
 
-cleanup_hint() {
-  local code=$?
-  [ "$code" -eq 0 ] && return 0
-  warn "Abbruch. Der Container $CTID wurde bereits angelegt."
-  warn "Aufräumen mit:  pct stop $CTID; pct destroy $CTID"
-  warn "Oder erneut versuchen mit:  pct exec $CTID -- bash /root/install.sh"
-  return "$code"
-}
 
 # Ohne Angabe übernimmt der Container die DNS-Einstellungen des Hosts.
 DNS_ARGS=()
 [ -n "$NAMESERVER" ]   && DNS_ARGS+=(--nameserver "$NAMESERVER")
 [ -n "$SEARCHDOMAIN" ] && DNS_ARGS+=(--searchdomain "$SEARCHDOMAIN")
+
+FEATURE_ARGS=()
+[ -n "$FEATURES" ] && FEATURE_ARGS+=(--features "$FEATURES")
 
 log "Lege Container $CTID an …"
 pct create "$CTID" "$TEMPLATE_REF" \
@@ -185,17 +251,18 @@ pct create "$CTID" "$TEMPLATE_REF" \
   --rootfs "${ROOTFS_STORAGE}:${DISK_GB}" \
   --net0 "$NET" \
   ${DNS_ARGS[@]+"${DNS_ARGS[@]}"} \
-  --features nesting=1 \
+  ${FEATURE_ARGS[@]+"${FEATURE_ARGS[@]}"} \
   --unprivileged 1 \
   --onboot "$START_ON_BOOT" \
   --ostype "$OSTYPE" \
   --description 'Warensystem Home – Haushalts-Warenwirtschaft' \
   >/dev/null
 
+fi
+
 trap cleanup_hint EXIT
 
-log 'Starte den Container …'
-pct start "$CTID"
+start_container
 
 # ---------------------------------------------------------------------------
 # Auf das Netzwerk warten

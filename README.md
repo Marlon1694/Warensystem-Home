@@ -145,6 +145,8 @@ an den Container bindest (FRITZ!Box: *Heimnetz → Netzwerk → Gerätedetails �
 | `TEMPLATE_STORAGE` | `local` | Speicher für die Container-Vorlage |
 | `PORT` | `4000` | Port der Anwendung |
 | `ENABLE_TLS` | `yes` | Zertifikat gleich mit erzeugen |
+| `FEATURES` | leer | Zusatzfunktionen des Containers, z. B. `nesting=1` |
+| `SKIP_CREATE` | `0` | `1` bespielt einen bereits vorhandenen Container |
 
 Danach:
 
@@ -152,6 +154,40 @@ Danach:
 pct exec <CTID> -- journalctl -u warensystem-home -f   # Protokoll ansehen
 pct exec <CTID> -- bash /root/install.sh               # auf neuen Stand bringen
 pct enter <CTID>                                       # Konsole im Container
+```
+
+#### Wenn der Container nicht startet
+
+Bleibt es beim Anlegen bei `Failed to spawn container`, ist der Container da,
+nur der Start scheitert. Die Meldung von LXC nennt die Ursache selten direkt –
+das Skript zeigt deshalb automatisch die ausführliche Fassung. Der Reihe nach:
+
+```bash
+pct start <CTID> --debug        # die eigentliche Meldung
+```
+
+**Zusatzfunktionen.** Manche Kernel, vor allem auf ARM-Hosts, kommen mit
+`nesting` nicht zurecht. Die Anwendung braucht es nicht, seit Fassung 1.1 wird
+es auch nicht mehr gesetzt. Bei einem älteren Container:
+
+```bash
+pct set <CTID> --features ''
+pct start <CTID>
+```
+
+**AppArmor.** Fehlt es im Kernel, scheitert der Start ohne klare Meldung. In
+`/etc/pve/lxc/<CTID>.conf` ergänzen:
+
+```
+lxc.apparmor.profile: unconfined
+```
+
+**Danach weitermachen, ohne neu anzulegen.** Läuft der Container, holt dieser
+Aufruf die Installation nach:
+
+```bash
+CTID=<CTID> SKIP_CREATE=1 \
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/Marlon1694/Warensystem-Home/HEAD/deploy/proxmox-lxc.sh)"
 ```
 
 #### Adresse eines bestehenden Containers ändern
