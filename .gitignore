@@ -24,3 +24,7 @@ Thumbs.db
 *.log
 .vscode/
 .idea/
+
+# Build der Browser-Demo
+dist-demo/
+web/dist-demo/

@@ -73,6 +73,63 @@ Die Adresse unter „Im Heimnetz“ ist die, die du auf dem iPhone öffnest.
 > Router eine feste IP-Adresse (in der FRITZ!Box unter *Heimnetz → Netzwerk →
 > Gerätedetails → „Immer die gleiche IPv4-Adresse zuweisen“*).
 
+### Auf Proxmox als LXC-Container
+
+Ein Skript legt einen unprivilegierten Container an und installiert alles
+darin. Auf der **Shell des Proxmox-Hosts** ausführen, nicht in einem Container:
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/Marlon1694/Warensystem-Home/HEAD/deploy/proxmox-lxc.sh)"
+```
+
+Vorgabe sind 2 Kerne, 1 GB Arbeitsspeicher, 8 GB Platte und eine Adresse per
+DHCP. Abweichungen über Umgebungsvariablen:
+
+```bash
+# Feste Adresse, mehr Arbeitsspeicher, anderer Speicher für die Festplatte
+IPV4=192.168.1.50/24 GATEWAY=192.168.1.1 RAM_MB=2048 ROOTFS_STORAGE=local-zfs \
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/Marlon1694/Warensystem-Home/HEAD/deploy/proxmox-lxc.sh)"
+```
+
+| Variable | Vorgabe | Bedeutung |
+|---|---|---|
+| `CTID` | nächste freie | Container-ID |
+| `CT_HOSTNAME` | `warensystem` | Name des Containers |
+| `CORES` / `RAM_MB` / `DISK_GB` | `2` / `1024` / `8` | Ausstattung |
+| `IPV4` / `GATEWAY` | `dhcp` | Feste Adresse statt DHCP |
+| `BRIDGE` | `vmbr0` | Netzwerkbrücke |
+| `ROOTFS_STORAGE` | `local-lvm` | Speicher für die Festplatte |
+| `TEMPLATE_STORAGE` | `local` | Speicher für die Container-Vorlage |
+| `PORT` | `4000` | Port der Anwendung |
+| `ENABLE_TLS` | `yes` | Zertifikat gleich mit erzeugen |
+
+Danach:
+
+```bash
+pct exec <CTID> -- journalctl -u warensystem-home -f   # Protokoll ansehen
+pct exec <CTID> -- bash /root/install.sh               # auf neuen Stand bringen
+pct enter <CTID>                                       # Konsole im Container
+```
+
+Der Container braucht keine besonderen Rechte: er läuft unprivilegiert, ohne
+Gerätedurchreichung und ohne Zugriff auf den Host. Datenbank und Sicherungen
+liegen darin unter `/var/lib/warensystem-home` – dieser Pfad gehört in die
+Sicherung des Containers.
+
+### Auf einem beliebigen Debian- oder Ubuntu-System
+
+Dasselbe Installationsskript läuft auch direkt auf einem Raspberry Pi, in
+einer VM oder auf einem alten Laptop:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Marlon1694/Warensystem-Home/HEAD/deploy/install.sh | sudo bash
+```
+
+Es installiert Node.js, legt einen eigenen Systembenutzer an, baut die
+Oberfläche, erzeugt ein Zertifikat und richtet den systemd-Dienst ein. Ein
+erneuter Aufruf bringt eine bestehende Installation auf den neuesten Stand,
+ohne die Daten anzufassen.
+
 ### Mit Docker
 
 ```bash
@@ -123,11 +180,17 @@ node scripts/generate-cert.mjs 192.168.1.42 vorrat.fritz.box
 
 ## Dauerbetrieb
 
-**Mit systemd** (Raspberry Pi, Linux-Server):
+**Mit dem Installationsskript** richtet sich der systemd-Dienst von selbst
+ein – im LXC-Container wie auf jedem anderen Debian- oder Ubuntu-System.
+
+**Von Hand:** `deploy/warensystem-home.service` ist eine Vorlage mit drei
+Platzhaltern (`__APP_USER__`, `__APP_DIR__`, `__DATA_DIR__`):
 
 ```bash
-sudo cp deploy/warensystem-home.service /etc/systemd/system/
-sudo nano /etc/systemd/system/warensystem-home.service   # Benutzer und Pfad anpassen
+sudo sed -e 's|__APP_USER__|warensystem|g' \
+         -e 's|__APP_DIR__|/opt/warensystem-home|g' \
+         -e 's|__DATA_DIR__|/var/lib/warensystem-home|g' \
+         deploy/warensystem-home.service > /etc/systemd/system/warensystem-home.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now warensystem-home
 ```
@@ -182,7 +245,14 @@ npm run dev         # API auf Port 4000, Oberfläche mit Hot Reload auf 5173
 npm test            # Integrationstests der API
 npm run typecheck   # TypeScript-Prüfung der Oberfläche
 npm run build       # Produktionsbuild der Oberfläche
+npm run build:demo  # Demo-Fassung als einzelne HTML-Datei zum Herzeigen
 ```
+
+`npm run build:demo` erzeugt eine Fassung, die ohne Server auskommt: ein
+Speicher im Browser beantwortet die Aufrufe an `/api` (siehe
+`web/src/demo/`). Praktisch, um die App jemandem zu zeigen, ohne dass etwas
+installiert werden muss. Die Daten darin sind Beispieldaten und verschwinden
+beim Neuladen.
 
 ### Aufbau
 
@@ -196,8 +266,9 @@ web/             Oberfläche: React, TypeScript, Vite, PWA
   src/api/       Zugriff auf die REST-API
   src/pages/     Die fünf Bereiche plus Artikel- und Einstellungsseiten
   src/styles/    Designtokens für hell und dunkel
-scripts/         Zertifikat erzeugen, Symbole erzeugen, Entwicklungsstart
-deploy/          systemd-Dienstdatei
+  src/demo/      Browser-Demo ohne Server (nur zum Herzeigen)
+scripts/         Zertifikat und Symbole erzeugen, Entwicklungsstart, Demo-Build
+deploy/          Installationsskripte für Proxmox und Debian, systemd-Vorlage
 ```
 
 ### Technische Entscheidungen

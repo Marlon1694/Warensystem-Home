@@ -1,11 +1,15 @@
-# Systemd-Dienst für Raspberry Pi, NAS oder einen kleinen Heimserver.
+# Dienstvorlage für Warensystem Home.
 #
-# Einrichten:
-#   sudo cp deploy/warensystem-home.service /etc/systemd/system/
+# deploy/install.sh setzt die Platzhalter ein und legt die Datei unter
+# /etc/systemd/system/warensystem-home.service ab. Für eine Installation von
+# Hand die drei Platzhalter selbst ersetzen:
+#
+#   __APP_USER__   Benutzer, unter dem der Dienst läuft   (z. B. warensystem)
+#   __APP_DIR__    Verzeichnis mit dem Quellcode          (z. B. /opt/warensystem-home)
+#   __DATA_DIR__   Verzeichnis für Datenbank und Backups  (z. B. /var/lib/warensystem-home)
+#
 #   sudo systemctl daemon-reload
 #   sudo systemctl enable --now warensystem-home
-#
-# Pfad und Benutzer unten an die eigene Installation anpassen.
 
 [Unit]
 Description=Warensystem Home – Haushalts-Warenwirtschaft
@@ -15,19 +19,23 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=pi
-WorkingDirectory=/home/pi/Warensystem-Home
-EnvironmentFile=-/home/pi/Warensystem-Home/.env
+User=__APP_USER__
+Group=__APP_USER__
+WorkingDirectory=__APP_DIR__
+EnvironmentFile=-__APP_DIR__/.env
 ExecStart=/usr/bin/node server/src/index.js
 Restart=always
 RestartSec=5
 
-# Der Dienst braucht nur seinen eigenen Ordner beschreibbar.
+# Der Dienst schreibt ausschließlich in sein Datenverzeichnis.
 NoNewPrivileges=true
 PrivateTmp=true
-ProtectSystem=full
-ProtectHome=read-only
-ReadWritePaths=/home/pi/Warensystem-Home/data
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+ReadWritePaths=__DATA_DIR__
 
 [Install]
 WantedBy=multi-user.target
