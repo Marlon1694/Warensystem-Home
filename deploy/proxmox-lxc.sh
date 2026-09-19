@@ -9,7 +9,16 @@
 #
 # Einstellungen über Umgebungsvariablen, zum Beispiel:
 #   CTID=140 RAM_MB=2048 ROOTFS_STORAGE=local-zfs bash deploy/proxmox-lxc.sh
+#
+# Feste IP-Adresse (die Netzmaske hinter dem Schrägstrich gehört dazu):
+#
 #   IPV4=192.168.1.50/24 GATEWAY=192.168.1.1 bash deploy/proxmox-lxc.sh
+#
+# DNS kommt sonst vom DHCP-Server. Bei fester Adresse übernimmt der Container
+# die Einstellungen des Proxmox-Hosts; mit NAMESERVER lässt sich das übergehen:
+#
+#   IPV4=192.168.1.50/24 GATEWAY=192.168.1.1 NAMESERVER=192.168.1.1 \
+#     bash deploy/proxmox-lxc.sh
 #
 set -euo pipefail
 
@@ -21,6 +30,8 @@ DISK_GB="${DISK_GB:-8}"
 BRIDGE="${BRIDGE:-vmbr0}"
 IPV4="${IPV4:-dhcp}"
 GATEWAY="${GATEWAY:-}"
+NAMESERVER="${NAMESERVER:-}"
+SEARCHDOMAIN="${SEARCHDOMAIN:-}"
 TEMPLATE_STORAGE="${TEMPLATE_STORAGE:-local}"
 ROOTFS_STORAGE="${ROOTFS_STORAGE:-local-lvm}"
 TEMPLATE_PREFIX="${TEMPLATE_PREFIX:-debian-13-standard}"
@@ -41,7 +52,63 @@ command -v pveam >/dev/null || die 'pveam wurde nicht gefunden.'
 CTID="${CTID:-$(pvesh get /cluster/nextid)}"
 pct status "$CTID" >/dev/null 2>&1 && die "Die ID $CTID ist bereits vergeben. Mit CTID=<Nummer> eine andere wählen."
 
-[ "$IPV4" = 'dhcp' ] || [ -n "$GATEWAY" ] || die 'Bei fester IP-Adresse bitte auch GATEWAY setzen.'
+# ---------------------------------------------------------------------------
+# Feste IP-Adresse prüfen
+#
+# Die drei Fehler, die hier regelmäßig passieren: vergessene Netzmaske,
+# Gateway in einem anderen Subnetz und eine bereits vergebene Adresse. Alle
+# drei fallen sonst erst viel später auf – als scheinbarer Netzwerkfehler.
+# ---------------------------------------------------------------------------
+
+is_ipv4() {
+  local octet
+  case "$1" in
+    *[!0-9.]*|*..*|.*|*.) return 1 ;;
+  esac
+  [ "$(printf '%s' "$1" | tr -cd . | wc -c)" -eq 3 ] || return 1
+  for octet in ${1//./ }; do
+    [ "$octet" -le 255 ] 2>/dev/null || return 1
+  done
+  return 0
+}
+
+ipv4_to_int() {
+  local IFS=.
+  # shellcheck disable=SC2086
+  set -- $1
+  echo $(( ($1 << 24) + ($2 << 16) + ($3 << 8) + $4 ))
+}
+
+if [ "$IPV4" != 'dhcp' ]; then
+  case "$IPV4" in
+    */*) ;;
+    *) die "IPV4 braucht die Netzmaske: IPV4=${IPV4}/24 statt IPV4=${IPV4}" ;;
+  esac
+
+  ADDRESS="${IPV4%%/*}"
+  PREFIX="${IPV4##*/}"
+
+  is_ipv4 "$ADDRESS" || die "IPV4 ist keine gültige IPv4-Adresse: ${ADDRESS}"
+  { [ "$PREFIX" -ge 1 ] && [ "$PREFIX" -le 32 ]; } 2>/dev/null \
+    || die "Die Netzmaske muss zwischen 1 und 32 liegen: /${PREFIX}"
+
+  [ -n "$GATEWAY" ] || die 'Bei fester IP-Adresse bitte auch GATEWAY setzen, z. B. GATEWAY=192.168.1.1'
+  is_ipv4 "$GATEWAY" || die "GATEWAY ist keine gültige IPv4-Adresse: ${GATEWAY}"
+
+  MASK=$(( 0xFFFFFFFF << (32 - PREFIX) & 0xFFFFFFFF ))
+  if [ $(( $(ipv4_to_int "$ADDRESS") & MASK )) -ne $(( $(ipv4_to_int "$GATEWAY") & MASK )) ]; then
+    die "Gateway ${GATEWAY} liegt nicht im Netz von ${ADDRESS}/${PREFIX}. Beide müssen im selben Subnetz liegen."
+  fi
+
+  if command -v ping >/dev/null 2>&1; then
+    if ping -c 1 -W 1 "$ADDRESS" >/dev/null 2>&1; then
+      die "Unter ${ADDRESS} antwortet bereits ein Gerät. Bitte eine freie Adresse wählen."
+    fi
+  else
+    # Lieber sagen als stillschweigend durchwinken.
+    warn "ping ist nicht verfügbar – ob ${ADDRESS} noch frei ist, wurde nicht geprüft."
+  fi
+fi
 
 # ---------------------------------------------------------------------------
 # Vorlage
@@ -104,6 +171,11 @@ cleanup_hint() {
   return "$code"
 }
 
+# Ohne Angabe übernimmt der Container die DNS-Einstellungen des Hosts.
+DNS_ARGS=()
+[ -n "$NAMESERVER" ]   && DNS_ARGS+=(--nameserver "$NAMESERVER")
+[ -n "$SEARCHDOMAIN" ] && DNS_ARGS+=(--searchdomain "$SEARCHDOMAIN")
+
 log "Lege Container $CTID an …"
 pct create "$CTID" "$TEMPLATE_REF" \
   --hostname "$CT_HOSTNAME" \
@@ -112,6 +184,7 @@ pct create "$CTID" "$TEMPLATE_REF" \
   --swap "$SWAP_MB" \
   --rootfs "${ROOTFS_STORAGE}:${DISK_GB}" \
   --net0 "$NET" \
+  ${DNS_ARGS[@]+"${DNS_ARGS[@]}"} \
   --features nesting=1 \
   --unprivileged 1 \
   --onboot "$START_ON_BOOT" \
@@ -128,13 +201,32 @@ pct start "$CTID"
 # Auf das Netzwerk warten
 # ---------------------------------------------------------------------------
 
-log 'Warte auf die Netzwerkverbindung …'
-for attempt in $(seq 1 60); do
+# Adresse und Namensauflösung getrennt prüfen: sonst sieht ein fehlender
+# DNS-Server genauso aus wie ein Container ohne Netzwerkanschluss.
+log 'Warte auf die Netzwerkadresse …'
+for attempt in $(seq 1 30); do
+  if pct exec "$CTID" -- ip -4 addr show dev eth0 2>/dev/null | grep -q 'inet '; then
+    break
+  fi
+  if [ "$attempt" -eq 30 ]; then
+    if [ "$IPV4" = 'dhcp' ]; then
+      die "Container $CTID hat keine Adresse erhalten. Prüfe die Bridge ${BRIDGE} und ob dort ein DHCP-Server antwortet."
+    fi
+    die "Container $CTID konnte ${IPV4} nicht einrichten. Prüfe die Bridge ${BRIDGE}."
+  fi
+  sleep 2
+done
+
+log 'Warte auf die Namensauflösung …'
+for attempt in $(seq 1 30); do
   if pct exec "$CTID" -- getent hosts deb.debian.org >/dev/null 2>&1; then
     break
   fi
-  if [ "$attempt" -eq 60 ]; then
-    die "Der Container $CTID hat keine Netzwerkverbindung. Prüfe Bridge ${BRIDGE} und DHCP."
+  if [ "$attempt" -eq 30 ]; then
+    warn "Die Adresse steht, aber Namen werden nicht aufgelöst."
+    warn "Im Container eingetragen:"
+    pct exec "$CTID" -- cat /etc/resolv.conf 2>/dev/null | sed 's/^/    /' >&2 || true
+    die "Bitte den Container mit NAMESERVER=<Adresse des DNS-Servers> neu anlegen, z. B. NAMESERVER=${GATEWAY:-192.168.1.1}"
   fi
   sleep 2
 done

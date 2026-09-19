@@ -86,17 +86,53 @@ Vorgabe sind 2 Kerne, 1 GB Arbeitsspeicher, 8 GB Platte und eine Adresse per
 DHCP. Abweichungen über Umgebungsvariablen:
 
 ```bash
-# Feste Adresse, mehr Arbeitsspeicher, anderer Speicher für die Festplatte
-IPV4=192.168.1.50/24 GATEWAY=192.168.1.1 RAM_MB=2048 ROOTFS_STORAGE=local-zfs \
+# Mehr Arbeitsspeicher, anderer Speicher für die Festplatte
+RAM_MB=2048 ROOTFS_STORAGE=local-zfs \
   bash -c "$(curl -fsSL https://raw.githubusercontent.com/Marlon1694/Warensystem-Home/HEAD/deploy/proxmox-lxc.sh)"
 ```
+
+#### Feste IP-Adresse
+
+Damit die Adresse im Heimnetz gleich bleibt – sonst ändert sich das Lesezeichen
+auf dem iPhone nach jedem Neustart:
+
+```bash
+IPV4=192.168.1.50/24 GATEWAY=192.168.1.1 \
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/Marlon1694/Warensystem-Home/HEAD/deploy/proxmox-lxc.sh)"
+```
+
+Drei Dinge sind dabei wichtig:
+
+- **Die Netzmaske hinter dem Schrägstrich gehört dazu** (`/24` bei einem
+  üblichen Heimnetz). Ohne sie bricht das Skript mit einem Hinweis ab.
+- **Gateway ist die Adresse des Routers** und muss im selben Netz liegen wie
+  der Container. Bei einer FRITZ!Box üblicherweise `192.168.178.1`, dann wäre
+  die Adresse des Containers z. B. `192.168.178.50/24`.
+- **Die Adresse muss frei sein** und außerhalb des DHCP-Bereichs des Routers
+  liegen, sonst vergibt der Router sie irgendwann ein zweites Mal. Das Skript
+  prüft vorab per Ping, ob dort schon jemand antwortet.
+
+Den DNS-Server liefert sonst der DHCP-Server mit. Bei fester Adresse übernimmt
+der Container die Einstellungen des Proxmox-Hosts – das passt meistens. Wenn
+nicht, lässt er sich mitgeben:
+
+```bash
+IPV4=192.168.178.50/24 GATEWAY=192.168.178.1 NAMESERVER=192.168.178.1 \
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/Marlon1694/Warensystem-Home/HEAD/deploy/proxmox-lxc.sh)"
+```
+
+Alternativ bleibt die Adresse auch bei DHCP gleich, wenn du sie im Router fest
+an den Container bindest (FRITZ!Box: *Heimnetz → Netzwerk → Gerätedetails →
+„Diesem Netzwerkgerät immer die gleiche IPv4-Adresse zuweisen“*).
 
 | Variable | Vorgabe | Bedeutung |
 |---|---|---|
 | `CTID` | nächste freie | Container-ID |
 | `CT_HOSTNAME` | `warensystem` | Name des Containers |
 | `CORES` / `RAM_MB` / `DISK_GB` | `2` / `1024` / `8` | Ausstattung |
-| `IPV4` / `GATEWAY` | `dhcp` | Feste Adresse statt DHCP |
+| `IPV4` / `GATEWAY` | `dhcp` | Feste Adresse statt DHCP, z. B. `192.168.1.50/24` und `192.168.1.1` |
+| `NAMESERVER` | Host-Einstellung | DNS-Server, meist die Adresse des Routers |
+| `SEARCHDOMAIN` | Host-Einstellung | Suchdomäne, z. B. `fritz.box` |
 | `BRIDGE` | `vmbr0` | Netzwerkbrücke |
 | `ROOTFS_STORAGE` | `local-lvm` | Speicher für die Festplatte |
 | `TEMPLATE_STORAGE` | `local` | Speicher für die Container-Vorlage |
@@ -109,6 +145,27 @@ Danach:
 pct exec <CTID> -- journalctl -u warensystem-home -f   # Protokoll ansehen
 pct exec <CTID> -- bash /root/install.sh               # auf neuen Stand bringen
 pct enter <CTID>                                       # Konsole im Container
+```
+
+#### Adresse eines bestehenden Containers ändern
+
+Läuft der Container schon mit DHCP, muss er dafür nicht neu angelegt werden:
+
+```bash
+pct set <CTID> --net0 name=eth0,bridge=vmbr0,ip=192.168.1.50/24,gw=192.168.1.1
+pct set <CTID> --nameserver 192.168.1.1      # nur falls nötig
+pct reboot <CTID>
+```
+
+Die Daten bleiben dabei unberührt – nur das Lesezeichen auf dem iPhone und,
+falls du HTTPS nutzt, das Zertifikat müssen nachgezogen werden. Das Zertifikat
+gilt für die Adressen, die beim Erzeugen vorlagen; nach einem Adresswechsel:
+
+```bash
+pct exec <CTID> -- runuser -u warensystem -- \
+  node /opt/warensystem-home/scripts/generate-cert.mjs 192.168.1.50
+pct exec <CTID> -- bash -c 'cp /opt/warensystem-home/certs/* /var/lib/warensystem-home/certs/ \
+  && rm -rf /opt/warensystem-home/certs && systemctl restart warensystem-home'
 ```
 
 Der Container braucht keine besonderen Rechte: er läuft unprivilegiert, ohne
