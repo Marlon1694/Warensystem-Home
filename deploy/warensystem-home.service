@@ -7,6 +7,7 @@
 #   __APP_USER__   Benutzer, unter dem der Dienst läuft   (z. B. warensystem)
 #   __APP_DIR__    Verzeichnis mit dem Quellcode          (z. B. /opt/warensystem-home)
 #   __DATA_DIR__   Verzeichnis für Datenbank und Backups  (z. B. /var/lib/warensystem-home)
+#   __NODE_BIN__   Pfad zu Node.js, Ausgabe von: command -v node
 #
 #   sudo systemctl daemon-reload
 #   sudo systemctl enable --now warensystem-home
@@ -23,7 +24,7 @@ User=__APP_USER__
 Group=__APP_USER__
 WorkingDirectory=__APP_DIR__
 EnvironmentFile=-__APP_DIR__/.env
-ExecStart=/usr/bin/node server/src/index.js
+ExecStart=__NODE_BIN__ server/src/index.js
 Restart=always
 RestartSec=5
 

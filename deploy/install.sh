@@ -159,9 +159,16 @@ fi
 # ---------------------------------------------------------------------------
 
 log 'Richte den systemd-Dienst ein …'
+
+# Der Pfad wird ermittelt statt fest eingetragen: bei einer Installation über
+# NodeSource liegt Node unter /usr/bin, bei einer vorhandenen Installation
+# (etwa über nvm oder ein entpacktes Archiv) auch ganz woanders.
+NODE_BIN="$(command -v node)"
+
 sed -e "s|__APP_USER__|${APP_USER}|g" \
     -e "s|__APP_DIR__|${APP_DIR}|g" \
     -e "s|__DATA_DIR__|${DATA_DIR}|g" \
+    -e "s|__NODE_BIN__|${NODE_BIN}|g" \
     "$APP_DIR/deploy/warensystem-home.service" > "/etc/systemd/system/${SERVICE_NAME}.service"
 
 systemctl daemon-reload

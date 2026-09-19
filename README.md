@@ -183,13 +183,14 @@ node scripts/generate-cert.mjs 192.168.1.42 vorrat.fritz.box
 **Mit dem Installationsskript** richtet sich der systemd-Dienst von selbst
 ein – im LXC-Container wie auf jedem anderen Debian- oder Ubuntu-System.
 
-**Von Hand:** `deploy/warensystem-home.service` ist eine Vorlage mit drei
-Platzhaltern (`__APP_USER__`, `__APP_DIR__`, `__DATA_DIR__`):
+**Von Hand:** `deploy/warensystem-home.service` ist eine Vorlage mit vier
+Platzhaltern:
 
 ```bash
 sudo sed -e 's|__APP_USER__|warensystem|g' \
          -e 's|__APP_DIR__|/opt/warensystem-home|g' \
          -e 's|__DATA_DIR__|/var/lib/warensystem-home|g' \
+         -e "s|__NODE_BIN__|$(command -v node)|g" \
          deploy/warensystem-home.service > /etc/systemd/system/warensystem-home.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now warensystem-home
