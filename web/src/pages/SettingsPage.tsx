@@ -3,7 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { Sheet } from '../components/Sheet';
 import { CategoryDot, ChipGroup, ErrorNotice, Field } from '../components/ui';
-import { IconBack, IconDownload, IconPlus, IconTrash, IconUpload, LocationIcon } from '../components/Icons';
+import {
+  IconBack,
+  IconCheck,
+  IconDownload,
+  IconPlus,
+  IconSort,
+  IconTrash,
+  IconUpload,
+  LocationIcon,
+} from '../components/Icons';
 import { useToast } from '../components/Toast';
 import {
   useCategories,
@@ -53,6 +62,9 @@ export function SettingsPage() {
   const [editingLocation, setEditingLocation] = useState<Partial<StorageLocation> | null>(null);
   const [editingCategory, setEditingCategory] = useState<Partial<Category> | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  // Die Pfeile erscheinen erst, wenn der Abschnitt aufs Sortieren gestellt ist –
+  // dauerhaft sichtbar machen sie die Listen unruhig.
+  const [sorting, setSorting] = useState<'locations' | 'categories' | null>(null);
 
   useEffect(() => {
     if (!settings.data) return;
@@ -210,13 +222,12 @@ export function SettingsPage() {
         <section aria-labelledby="locations-heading">
           <div className="section-title">
             <h2 id="locations-heading">Lagerorte</h2>
-            <button
-              type="button"
-              className="btn btn--small"
-              onClick={() => setEditingLocation({ kind: 'pantry' })}
-            >
-              <IconPlus size={15} /> Neu
-            </button>
+            <SectionActions
+              sorting={sorting === 'locations'}
+              canSort={(locations.data?.length ?? 0) > 1}
+              onToggleSort={() => setSorting(sorting === 'locations' ? null : 'locations')}
+              onAdd={() => setEditingLocation({ kind: 'pantry' })}
+            />
           </div>
 
           <ul className="list">
@@ -237,13 +248,15 @@ export function SettingsPage() {
                   </div>
                 </button>
 
-                <ReorderButtons
-                  label={location.name}
-                  index={index}
-                  count={locations.data?.length ?? 0}
-                  onMove={(direction) =>
-                    move(locations.data, index, direction, reorderLocations.mutate)}
-                />
+                {sorting === 'locations' ? (
+                  <ReorderButtons
+                    label={location.name}
+                    index={index}
+                    count={locations.data?.length ?? 0}
+                    onMove={(direction) =>
+                      move(locations.data, index, direction, reorderLocations.mutate)}
+                  />
+                ) : null}
 
                 <button
                   type="button"
@@ -262,13 +275,12 @@ export function SettingsPage() {
         <section aria-labelledby="categories-heading">
           <div className="section-title">
             <h2 id="categories-heading">Warengruppen</h2>
-            <button
-              type="button"
-              className="btn btn--small"
-              onClick={() => setEditingCategory({ color: '#6b7280' })}
-            >
-              <IconPlus size={15} /> Neu
-            </button>
+            <SectionActions
+              sorting={sorting === 'categories'}
+              canSort={(categories.data?.length ?? 0) > 1}
+              onToggleSort={() => setSorting(sorting === 'categories' ? null : 'categories')}
+              onAdd={() => setEditingCategory({ color: '#6b7280' })}
+            />
           </div>
 
           <ul className="list">
@@ -285,13 +297,15 @@ export function SettingsPage() {
                   <div className="list__meta">{category.article_count} Artikel</div>
                 </button>
 
-                <ReorderButtons
-                  label={category.name}
-                  index={index}
-                  count={categories.data?.length ?? 0}
-                  onMove={(direction) =>
-                    move(categories.data, index, direction, reorderCategories.mutate)}
-                />
+                {sorting === 'categories' ? (
+                  <ReorderButtons
+                    label={category.name}
+                    index={index}
+                    count={categories.data?.length ?? 0}
+                    onMove={(direction) =>
+                      move(categories.data, index, direction, reorderCategories.mutate)}
+                  />
+                ) : null}
 
                 <button
                   type="button"
@@ -441,6 +455,42 @@ export function SettingsPage() {
         </div>
       </Sheet>
     </Layout>
+  );
+}
+
+/**
+ * Kopfzeile eines Abschnitts: umschalten aufs Sortieren oder etwas anlegen.
+ * Beim Sortieren tritt "Neu" zurück – dann geht es nur um die Reihenfolge.
+ */
+function SectionActions({
+  sorting,
+  canSort,
+  onToggleSort,
+  onAdd,
+}: {
+  sorting: boolean;
+  canSort: boolean;
+  onToggleSort: () => void;
+  onAdd: () => void;
+}) {
+  return (
+    <div className="row" style={{ gap: 'var(--space-2)' }}>
+      {canSort ? (
+        <button
+          type="button"
+          className={sorting ? 'btn btn--small btn--primary' : 'btn btn--small'}
+          onClick={onToggleSort}
+        >
+          {sorting ? <><IconCheck size={15} /> Fertig</> : <><IconSort size={15} /> Sortieren</>}
+        </button>
+      ) : null}
+
+      {sorting ? null : (
+        <button type="button" className="btn btn--small" onClick={onAdd}>
+          <IconPlus size={15} /> Neu
+        </button>
+      )}
+    </div>
   );
 }
 

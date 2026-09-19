@@ -24,9 +24,15 @@ Haushalt, nicht beim Gerät – sie sieht also auf iPhone und Laptop gleich aus.
 
 **Lagerorte.** Kühlschrank, Gefrierfach, Vorratskammer, Küche und Keller sind
 vorangelegt. Weitere Orte – Gefriertruhe im Keller, Getränkeregal, Speisekammer –
-lassen sich jederzeit ergänzen und mit passendem Symbol versehen. Lagerorte und
-Warengruppen lassen sich in den Einstellungen in die eigene Reihenfolge bringen;
-sie gilt überall, wo die Listen auftauchen.
+lassen sich jederzeit ergänzen und mit passendem Symbol versehen.
+
+Lagerorte und Warengruppen lassen sich in die eigene Reihenfolge bringen – in
+den Einstellungen über „Sortieren“ am jeweiligen Abschnitt. Die Pfeile
+erscheinen nur in diesem Modus, damit die Listen sonst ruhig bleiben. Die
+gewählte Folge gilt überall, wo die Listen auftauchen: in den Auswahlfeldern,
+den Filtern auf der Bestandsseite und auf der Übersicht.
+
+<img src="docs/screenshots/einstellungen-sortieren.png" alt="Sortiermodus" width="260">
 
 **Bestand nach Posten.** Ein Artikel kann gleichzeitig an mehreren Orten und mit
 unterschiedlichen Haltbarkeitsdaten liegen. Zwei Packungen Milch mit

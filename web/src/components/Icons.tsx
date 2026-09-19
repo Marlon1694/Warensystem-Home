@@ -74,6 +74,10 @@ export const IconClock = (p: IconProps) => (
   <Icon {...p}><circle cx="12" cy="12" r="8.6" /><path d="M12 7v5.3l3.3 2" /></Icon>
 );
 
+export const IconSort = (p: IconProps) => (
+  <Icon {...p}><path d="M7.5 4.5v15" /><path d="M4 8l3.5-3.5L11 8" /><path d="M16.5 19.5v-15" /><path d="M13 16l3.5 3.5L20 16" /></Icon>
+);
+
 export const IconMove = (p: IconProps) => (
   <Icon {...p}><path d="M4 8.5h13" /><path d="m13.5 5 3.5 3.5-3.5 3.5" /><path d="M20 15.5H7" /><path d="M10.5 12 7 15.5 10.5 19" /></Icon>
 );
